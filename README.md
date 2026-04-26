@@ -51,7 +51,7 @@ See `src/bridges/` for working examples.
 git clone https://github.com/ExaDev/agent-bus.git
 ```
 
-Below, `AGENT_BUS_DIR` refers to wherever you cloned it.
+Below, replace `/absolute/path/to/agent-bus` with your actual clone path.
 
 ## Built-in bridges
 
@@ -78,7 +78,7 @@ Add to `.mcp.json`:
   "mcpServers": {
     "agent-bus": {
       "command": "bun",
-      "args": ["$AGENT_BUS_DIR/src/bridges/claude-code/channel.ts"]
+      "args": ["/absolute/path/to/agent-bus/src/bridges/claude-code/channel.ts"]
     }
   }
 }
@@ -93,7 +93,7 @@ Run with channels enabled: `claude --dangerously-load-development-channels`
 ```toml
 [mcp_servers.agent-bus]
 command = "node"
-args = ["--experimental-strip-types", "$AGENT_BUS_DIR/src/bridges/codex/tool.ts"]
+args = ["--experimental-strip-types", "/absolute/path/to/agent-bus/src/bridges/codex/tool.ts"]
 ```
 
 **Stop hook** — add to `~/.codex/hooks.json` (requires `codex_hooks = true` in config):
@@ -104,7 +104,7 @@ args = ["--experimental-strip-types", "$AGENT_BUS_DIR/src/bridges/codex/tool.ts"
     "Stop": [{
       "hooks": [{
         "type": "command",
-        "command": "python3 $AGENT_BUS_DIR/src/bridges/codex/stop_hook.py",
+        "command": "python3 /absolute/path/to/agent-bus/src/bridges/codex/stop_hook.py",
         "timeout": 5
       }]
     }]
