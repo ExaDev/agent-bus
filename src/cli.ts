@@ -20,7 +20,7 @@ import * as os from "node:os";
 import { execSync, spawn } from "node:child_process";
 
 const HOME = os.homedir();
-const PKG_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname));
+const PKG_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 // ---------------------------------------------------------------------------
 // Types
