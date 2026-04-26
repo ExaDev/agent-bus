@@ -16,6 +16,23 @@ Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibi
 
 Every operation is a file read/write. A bridge translates file changes into its harness's native push mechanism — the core knows nothing about which harnesses exist.
 
+## Install
+
+```bash
+npx github:ExaDev/agent-bus          # auto-detect harnesses and configure
+npx github:ExaDev/agent-bus status    # check current configuration
+npx github:ExaDev/agent-bus remove    # undo configuration
+```
+
+Or clone and run manually:
+
+```bash
+git clone https://github.com/ExaDev/agent-bus.git
+cd agent-bus && node bin/setup.mjs
+```
+
+The CLI detects which harnesses are installed (pi, Claude Code, Codex, OpenCode) and writes the appropriate config files automatically.
+
 ## Adding a new harness
 
 A bridge is two things:
@@ -44,86 +61,6 @@ for (const line of lines) await yourHarness.push(`📬 ${line}`);
 ```
 
 See `src/bridges/` for working examples.
-
-## Install
-
-```bash
-git clone https://github.com/ExaDev/agent-bus.git
-```
-
-Below, replace `/absolute/path/to/agent-bus` with your actual clone path.
-
-## Built-in bridges
-
-| Harness | Push mechanism |
-|---------|---------------|
-| **pi** | `fs.watch` → `sendUserMessage()` |
-| **Claude Code** | Poll delivery → MCP `<channel>` notification |
-| **Codex** | `Stop` hook → `decision: "block"` with messages as `reason` |
-| **OpenCode** | `session.idle` event → `tui.prompt.append` + `submitPrompt()` |
-
-### pi
-
-```bash
-mkdir -p ~/.pi/agent/extensions/agent-bus
-ln -s $AGENT_BUS_DIR/src/bridges/pi/index.ts ~/.pi/agent/extensions/agent-bus/index.ts
-```
-
-### Claude Code
-
-Add to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "agent-bus": {
-      "command": "bun",
-      "args": ["/absolute/path/to/agent-bus/src/bridges/claude-code/channel.ts"]
-    }
-  }
-}
-```
-
-Run with channels enabled: `claude --dangerously-load-development-channels`
-
-### Codex
-
-**MCP tool server** — add to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.agent-bus]
-command = "node"
-args = ["--experimental-strip-types", "/absolute/path/to/agent-bus/src/bridges/codex/tool.ts"]
-```
-
-**Stop hook** — add to `~/.codex/hooks.json` (requires `codex_hooks = true` in config):
-
-```json
-{
-  "hooks": {
-    "Stop": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 /absolute/path/to/agent-bus/src/bridges/codex/stop_hook.py",
-        "timeout": 5
-      }]
-    }]
-  }
-}
-```
-
-### OpenCode
-
-```bash
-# Project-level
-mkdir -p .opencode/plugins
-ln -s $AGENT_BUS_DIR/src/bridges/opencode/plugin.ts .opencode/plugins/agent-bus.ts
-
-# Or global
-ln -s $AGENT_BUS_DIR/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-bus.ts
-```
-
-Add to `.opencode/package.json`: `{ "dependencies": { "@opencode-ai/plugin": "*" } }`
 
 ## Usage
 

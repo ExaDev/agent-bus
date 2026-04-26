@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Cross-harness agent communication bus — filesystem-based rooms, DMs, and presence for LLM agents",
   "type": "module",
+  "bin": {
+    "agent-bus": "bin/setup.mjs"
+  },
   "scripts": {
     "build": "tsc",
     "test": "node --test dist/test/**/*.test.js",
