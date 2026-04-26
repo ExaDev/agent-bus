@@ -22,7 +22,7 @@ export interface AgentIdentity {
   /** Human-readable name, set by the agent or user. */
   name: string;
   /** Which harness is running this agent. */
-  harness: "pi" | "claude-code" | "unknown";
+  harness: "pi" | "claude-code" | "codex" | "opencode" | "unknown";
   /** OS process ID for liveness checks. */
   pid: number;
   startedAt: string;

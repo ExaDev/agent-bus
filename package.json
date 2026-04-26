@@ -8,9 +8,7 @@
     "test": "node --test dist/test/**/*.test.js",
     "lint": "tsc --noEmit"
   },
-  "dependencies": {
-    "typebox": "*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@mariozechner/pi-ai": "0.70.2",
     "@mariozechner/pi-coding-agent": "0.70.2",
