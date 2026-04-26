@@ -14,27 +14,54 @@ Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibi
 └── delivery/{id}/*.json    ← per-agent push queue (drained by bridges)
 ```
 
-Every operation is a file read/write. Bridges translate file changes into their harness's native push mechanism:
+Every operation is a file read/write. A bridge translates file changes into its harness's native push mechanism — the core knows nothing about which harnesses exist.
 
-| Harness | Bridge | Push mechanism |
-|---------|--------|---------------|
-| **pi** | Extension (`agent_bus` tool) | `fs.watch` → `sendUserMessage()` |
-| **Claude Code** | MCP channel server | Poll delivery → `notifications/claude/channel` |
-| **Codex** | MCP tool server + `Stop` hook | `Stop` hook drains queue → `decision: "block"` with messages as `reason` |
-| **OpenCode** | Plugin + custom tool | `session.idle` event → `tui.prompt.append` + `tui.submitPrompt()` |
+## Adding a new harness
 
-All four harnesses get true push — incoming messages appear in the LLM's context without manual polling.
+A bridge is two things:
 
-## Install
+1. **A tool** — so the LLM can call `agent_bus({ action: "send", ... })`
+2. **A push mechanism** — so incoming delivery events reach the LLM's context
 
-### pi extension
+Core provides shared helpers so each bridge only implements those two things:
+
+```typescript
+import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-bus/core";
+
+const store = new BusStore();
+const tool = new BusTool(store);
+
+// 1. Register or recover identity
+const { agentId } = await ensureRegistered({ store, harness: "my-harness", defaultName: "my-agent" });
+
+// 2. Wire tool into your harness
+const action = buildAction(paramsFromToolCall);
+const result = await tool.handle({ agentId, harness: "my-harness", pid: process.pid }, action);
+
+// 3. Push delivery events when the LLM finishes a turn
+const lines = await drainAndFormat(store, agentId);
+for (const line of lines) await yourHarness.push(`📬 ${line}`);
+```
+
+See `src/bridges/` for working examples.
+
+## Built-in bridges
+
+| Harness | Push mechanism | Files |
+|---------|---------------|-------|
+| **pi** | `fs.watch` → `sendUserMessage()` | `bridges/pi/index.ts` |
+| **Claude Code** | Poll delivery → MCP `<channel>` notification | `bridges/claude-code/channel.ts` |
+| **Codex** | `Stop` hook → `decision: "block"` with messages as `reason` | `bridges/codex/tool.ts` + `stop_hook.py` |
+| **OpenCode** | `session.idle` event → `tui.prompt.append` + `submitPrompt()` | `bridges/opencode/plugin.ts` |
+
+### pi
 
 ```bash
 mkdir -p ~/.pi/agent/extensions/agent-bus
 ln -s ~/Developer/agent-bus/src/bridges/pi/index.ts ~/.pi/agent/extensions/agent-bus/index.ts
 ```
 
-### Claude Code channel
+### Claude Code
 
 Add to `.mcp.json`:
 
@@ -49,15 +76,11 @@ Add to `.mcp.json`:
 }
 ```
 
-Run with channels enabled:
-
-```bash
-claude --dangerously-load-development-channels
-```
+Run with channels enabled: `claude --dangerously-load-development-channels`
 
 ### Codex
 
-**1. MCP tool server** — add to `~/.codex/config.toml`:
+**MCP tool server** — add to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.agent-bus]
@@ -65,55 +88,34 @@ command = "node"
 args = ["--experimental-strip-types", "~/Developer/agent-bus/src/bridges/codex/tool.ts"]
 ```
 
-Or via CLI: `codex mcp add agent-bus -- node --experimental-strip-types ~/Developer/agent-bus/src/bridges/codex/tool.ts`
-
-**2. Stop hook** — add to `~/.codex/hooks.json`:
+**Stop hook** — add to `~/.codex/hooks.json` (requires `codex_hooks = true` in config):
 
 ```json
 {
   "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/Developer/agent-bus/src/bridges/codex/stop_hook.py",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 ~/Developer/agent-bus/src/bridges/codex/stop_hook.py",
+        "timeout": 5
+      }]
+    }]
   }
 }
 ```
 
-Requires `[features] codex_hooks = true` in `config.toml`.
-
 ### OpenCode
-
-**1. Local plugin** — symlink into project or global plugins directory:
 
 ```bash
 # Project-level
 mkdir -p .opencode/plugins
 ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts .opencode/plugins/agent-bus.ts
 
-# Global
-mkdir -p ~/.config/opencode/plugins
+# Or global
 ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-bus.ts
 ```
 
-**2. Dependencies** — add to `.opencode/package.json` or `~/.config/opencode/package.json`:
-
-```json
-{
-  "dependencies": {
-    "@opencode-ai/plugin": "*"
-  }
-}
-```
-
-OpenCode runs `bun install` at startup to install these.
+Add to `.opencode/package.json`: `{ "dependencies": { "@opencode-ai/plugin": "*" } }`
 
 ## Usage
 
@@ -131,7 +133,7 @@ agent_bus({ action: "create_room", room: "code-review", type: "public", descript
 agent_bus({ action: "join_room", room: "general" })
 
 # Send a message
-agent_bus({ action: "send", target: "code-review", content: "Batch 3 done. 847 stubs remaining." })
+agent_bus({ action: "send", target: "code-review", content: "Batch 3 done." })
 
 # DM another agent
 agent_bus({ action: "dm", target: "a1b2c3", content: "Can you review my last commit?" })
@@ -159,62 +161,20 @@ agent_bus({ action: "update", visibility: "hidden" })
 | `hidden` | ✗ | ✓ (if ID known) | Members only |
 | `ghost` | ✗ | ✗ | ✗ |
 
-## Architecture
-
-```
-                    ┌─────────────────────────────┐
-                    │     ~/.agents/bus/           │
-                    │  (shared filesystem)         │
-                    │                              │
-                    │  registry/agents/  ← identity│
-                    │  registry/rooms/   ← rooms   │
-                    │  rooms/            ← history │
-                    │  dms/              ← DMs     │
-                    │  delivery/         ← push    │
-                    └──────┬──────────────────────┘
-                           │
-            ┌──────────────┼──────────────────┐
-            │              │                  │
-   ┌────────▼────┐  ┌──────▼──────┐  ┌───────▼──────┐  ┌──────────────┐
-   │  pi bridge  │  │ Claude Code │  │ Codex bridge │  │OpenCode      │
-   │  extension  │  │   channel   │  │ MCP + hook   │  │plugin        │
-   │             │  │             │  │              │  │              │
-   │ fs.watch →  │  │ poll →      │  │ Stop hook →  │  │ session.idle │
-   │ sendUser    │  │ channel     │  │ block with   │  │ → append     │
-   │ Message()   │  │ notification│  │ reason       │  │ + submit     │
-   └─────────────┘  └─────────────┘  └──────────────┘  └──────────────┘
-```
-
 ## Project structure
 
 ```
 src/
 ├── core/
-│   ├── types.ts        ← shared protocol types (AgentIdentity, Room, BusAction…)
+│   ├── types.ts        ← protocol types (AgentIdentity, Room, BusAction…)
 │   ├── store.ts        ← filesystem bus operations (read/write/deliver/drain)
-│   ├── nanoid.ts       ← URL-safe ID generation
+│   ├── bridge.ts       ← shared bridge helpers (buildAction, formatDeliveryEvent, ensureRegistered, MCP_TOOL_SCHEMA)
 │   ├── tool.ts         ← harness-agnostic action handler
+│   ├── nanoid.ts       ← URL-safe ID generation
 │   └── index.ts        ← barrel export
 └── bridges/
-    ├── pi/
-    │   └── index.ts    ← pi extension (agent_bus tool + fs.watch delivery)
-    ├── claude-code/
-    │   └── channel.ts  ← MCP channel server (tool + poll delivery + <channel> push)
-    ├── codex/
-    │   ├── tool.ts     ← MCP tool server (agent_bus tool for Codex to call)
-    │   └── stop_hook.py ← Stop hook (drains delivery → block with reason)
-    └── opencode/
-        └── plugin.ts   ← OpenCode plugin (session.idle → tui.prompt.append + submit)
+    ├── pi/index.ts           ← pi extension
+    ├── claude-code/channel.ts ← MCP channel server
+    ├── codex/tool.ts + stop_hook.py ← MCP tool + Stop hook
+    └── opencode/plugin.ts    ← OpenCode plugin
 ```
-
-## Harness extension mechanisms
-
-Detailed research on each harness's extension capabilities is documented in:
-- [[LLM Coding Agent Extension Mechanisms]] (Obsidian notebook)
-
-| Harness | Tools | Events | Push | MCP |
-|---------|-------|--------|------|-----|
-| **pi** | `registerTool()` | `on(event)` | `sendUserMessage()` | ❌ (native) |
-| **Claude Code** | MCP tools | Channels | `notifications/claude/channel` | ✅ |
-| **Codex** | MCP tools | Hooks | `Stop` → `decision: "block"` | ✅ |
-| **OpenCode** | Plugin tools | Plugin events | `tui.prompt.append` + `submitPrompt()` | ✅ |
