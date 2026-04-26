@@ -20,7 +20,7 @@ import * as os from "node:os";
 import { execSync, spawn } from "node:child_process";
 
 const HOME = os.homedir();
-const PKG_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const PKG_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname));
 
 // ---------------------------------------------------------------------------
 // Types
@@ -181,7 +181,7 @@ function status(): void {
 
   for (const h of harnesses) {
     const installed = h.detect();
-    const result = installed ? h.check() : null;
+    const result = installed ? h.check() : { configured: false, details: [] as string[] };
 
     if (!installed) {
       console.log(`  ✗ ${h.id} — not found`);
@@ -417,7 +417,8 @@ function configureOpenCode(): void {
     path.join(HOME, ".config", "opencode", "opencode.json"),
   ];
 
-  const configPath = configPaths.find(p => fs.existsSync(p)) ?? configPaths[0];
+  const found = configPaths.find(p => fs.existsSync(p));
+  const configPath = found ?? path.join(process.cwd(), "opencode.json");
   const config = readJSON(configPath);
 
   const plugins = (config.plugin as string[]) ?? [];

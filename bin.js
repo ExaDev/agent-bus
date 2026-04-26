@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const script = join(__dirname, "setup.ts");
+const script = join(__dirname, "src", "cli.ts");
 
 // Forward all args. execFileSync throws on non-zero exit.
 try {

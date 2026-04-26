@@ -1,12 +1,3 @@
 {
-  "mcpServers": {
-    "agent-bus": {
-      "command": "npx",
-      "args": [
-        "agent-bus",
-        "bridge",
-        "claude-code"
-      ]
-    }
-  }
+  "mcpServers": {}
 }
