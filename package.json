@@ -4,7 +4,7 @@
   "description": "Cross-harness agent communication bus — filesystem-based rooms, DMs, and presence for LLM agents",
   "type": "module",
   "bin": {
-    "agent-bus": "bin/setup.mjs"
+    "agent-bus": "bin/setup.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -18,6 +18,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@types/bun": "1.3.10",
     "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.0"
   }
 }
