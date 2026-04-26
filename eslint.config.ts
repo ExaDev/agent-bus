@@ -43,9 +43,40 @@ const banEslintDisableRule: Rule.RuleModule = {
 
 // ─── Custom plugin ───────────────────────────────────────────────────────────
 
+const noPointlessReassignments: Rule.RuleModule = {
+  meta: {
+    type: "problem",
+    messages: {
+      pointlessReassignment:
+        "Pointless reassignment. {{ name }} is just an alias for {{ value }}. Use the original directly instead.",
+    },
+  },
+  create(context) {
+    return {
+      VariableDeclarator(node) {
+        if (node.id.type !== "Identifier" || node.init?.type !== "Identifier") {
+          return;
+        }
+        if (node.id.name.startsWith("_")) {
+          return;
+        }
+        context.report({
+          node,
+          messageId: "pointlessReassignment",
+          data: {
+            name: node.id.name,
+            value: node.init.name,
+          },
+        });
+      },
+    };
+  },
+};
+
 const customPlugin = {
   rules: {
     banEslintDisable: banEslintDisableRule,
+    "no-pointless-reassignments": noPointlessReassignments,
   },
 };
 
@@ -83,6 +114,7 @@ export default defineConfig(
         { assertionStyle: "never" },
       ],
       "custom/banEslintDisable": "error",
+      "custom/no-pointless-reassignments": "error",
       "no-restricted-syntax": [
         "error",
         {
