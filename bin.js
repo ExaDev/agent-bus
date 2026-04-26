@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(__dirname, "src");
-const tmpDir = join(tmpdir(), `agent-bus-${process.pid}`);
+const tmpDir = join(tmpdir(), `agent-comms-${process.pid}`);
 
 // Copy src/ to temp location so Node can type-strip it
 mkdirSync(tmpDir, { recursive: true });

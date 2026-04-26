@@ -3,7 +3,8 @@
  * Uses crypto.getRandomValues for cryptographic randomness.
  */
 
-const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+const ALPHABET =
+  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
 const SIZE = 21;
 
 export function nanoid(size: number = SIZE): string {
@@ -11,7 +12,7 @@ export function nanoid(size: number = SIZE): string {
   crypto.getRandomValues(bytes);
   let id = "";
   for (let i = 0; i < size; i++) {
-    id += ALPHABET[bytes[i]! % ALPHABET.length];
+    id += ALPHABET.charAt(bytes[i] % ALPHABET.length);
   }
   return id;
 }

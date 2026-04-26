@@ -1,5 +1,5 @@
 /**
- * Agent Bus — cross-harness LLM agent communication.
+ * Agent Comms — cross-harness LLM agent communication.
  *
  * Core protocol: types, filesystem store, tool handler.
  * Bridges (pi extension, Claude Code channel) are in ../bridges/.

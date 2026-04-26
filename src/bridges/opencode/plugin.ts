@@ -1,11 +1,11 @@
 /**
- * Agent Bus — OpenCode plugin bridge.
+ * Agent Comms — OpenCode plugin bridge.
  *
  * Drains delivery queue on session.idle and injects messages via
  * tui.prompt.append + tui.submitPrompt.
  *
- * Install (project):  ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts .opencode/plugins/agent-bus.ts
- * Install (global):   ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-bus.ts
+ * Install (project):  ln -s ~/Developer/agent-comms/src/bridges/opencode/plugin.ts .opencode/plugins/agent-comms.ts
+ * Install (global):   ln -s ~/Developer/agent-comms/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-comms.ts
  */
 
 import * as fs from "node:fs";
@@ -14,54 +14,79 @@ import * as os from "node:os";
 
 import {
   BusStore,
-  BusTool,
-  buildAction,
   ensureRegistered,
   drainAndFormat,
 } from "../../core/index.js";
-import type { AgentId } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
 const store = new BusStore(path.join(os.homedir(), ".agents", "bus"));
-const tool = new BusTool(store);
 
-let agentId: AgentId | undefined;
-let watcher: fs.FSWatcher | undefined;
+// Minimal interface for the OpenCode SDK client we actually use
+interface OpenCodeClient {
+  tui: {
+    appendPrompt(body: { text: string }): Promise<unknown>;
+    submitPrompt(): Promise<unknown>;
+  };
+  session: {
+    list(): Promise<{ data: { id: string }[] }>;
+    prompt(opts: {
+      path: { id: string };
+      body: { parts: { type: string; text: string }[] };
+    }): Promise<unknown>;
+  };
+}
 
-export const AgentBusPlugin = async ({ client }: {
+function isOpenCodeClient(value: unknown): value is OpenCodeClient {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("tui" in value)) return false;
+  if (!("session" in value)) return false;
+  return true;
+}
+
+export const AgentCommsPlugin = async (opts: {
   project: unknown;
-  client: any; // @opencode-ai/sdk — typed as any to avoid hard dep
+  client: unknown;
   $: unknown;
   directory: string;
   worktree: string;
 }) => {
-  const reg = await ensureRegistered({ store, harness: "opencode", defaultName: `opencode-${nanoid(4)}` });
-  agentId = reg.agentId;
+  if (!isOpenCodeClient(opts.client)) {
+    throw new Error("Agent Comms plugin requires a valid OpenCode client");
+  }
+  const client = opts.client;
+
+  const reg = await ensureRegistered({
+    store,
+    harness: "opencode",
+    defaultName: `opencode-${nanoid(4)}`,
+  });
+  const agentId = reg.agentId;
 
   // Watch delivery dir so we know when messages arrive
   const deliveryDir = store.deliveryDir(agentId);
   fs.mkdirSync(deliveryDir, { recursive: true });
-  watcher = fs.watch(deliveryDir, () => {
+  fs.watch(deliveryDir, () => {
     // Don't push immediately — session.idle will drain
   });
 
   async function drainAndInject() {
-    if (!agentId) return;
     const lines = await drainAndFormat(store, agentId);
     if (lines.length === 0) return;
 
-    const message = "📬 Agent Bus:\n" + lines.map(l => `- ${l}`).join("\n");
+    const message = "📬 Agent Comms:\n" + lines.map((l) => `- ${l}`).join("\n");
     try {
       await client.tui.appendPrompt({ body: { text: message } });
       await client.tui.submitPrompt();
     } catch {
       // Fallback: prompt the current session directly
       const sessions = await client.session.list();
-      const current = sessions.data?.[0];
+      const current = sessions.data[0];
       if (current) {
         await client.session.prompt({
           path: { id: current.id },
-          body: { parts: [{ type: "text", text: message }] },
+          body: {
+            parts: [{ type: "text", text: message }],
+          },
         });
       }
     }

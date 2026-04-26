@@ -63,13 +63,22 @@ export class BusTool {
         case "destroy_room":
           return await this.destroyRoom(ctx, action);
         default:
-          return { content: `Unknown action: ${(action as { action: string }).action}`, isError: true };
+          return {
+            content: `Unknown action: ${(action as { action: string }).action}`,
+            isError: true,
+          };
       }
     } catch (err) {
       if (err instanceof BusError) {
-        return { content: `Error: ${err.message} (${err.code})`, isError: true };
+        return {
+          content: `Error: ${err.message} (${err.code})`,
+          isError: true,
+        };
       }
-      return { content: `Internal error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
+      return {
+        content: `Internal error: ${err instanceof Error ? err.message : String(err)}`,
+        isError: true,
+      };
     }
   }
 
@@ -94,7 +103,9 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "update" },
   ): Promise<ToolResult> {
-    const patch: Partial<Pick<AgentIdentity, "name" | "visibility" | "status" | "tags" | "pid">> = {};
+    const patch: Partial<
+      Pick<AgentIdentity, "name" | "visibility" | "status" | "tags" | "pid">
+    > = {};
     if (action.visibility !== undefined) patch.visibility = action.visibility;
     if (action.status !== undefined) patch.status = action.status;
     if (action.name !== undefined) patch.name = action.name;
@@ -143,7 +154,8 @@ export class BusTool {
 
   private async listRooms(ctx: ToolContext): Promise<ToolResult> {
     const rooms = await this.store.listRooms(ctx.agentId);
-    if (rooms.length === 0) return { content: "No rooms found.", isError: false };
+    if (rooms.length === 0)
+      return { content: "No rooms found.", isError: false };
 
     const lines = rooms.map((r: Room) => {
       const memberFlag = r.members.includes(ctx.agentId) ? "✓" : " ";
@@ -171,7 +183,10 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "leave_room" },
   ): Promise<ToolResult> {
-    await this.store.leaveRoom(action.room as import("./types.js").RoomId, ctx.agentId);
+    await this.store.leaveRoom(
+      action.room as import("./types.js").RoomId,
+      ctx.agentId,
+    );
     return { content: `Left room "${action.room}".`, isError: false };
   }
 
@@ -180,7 +195,12 @@ export class BusTool {
     action: BusAction & { action: "send" },
   ): Promise<ToolResult> {
     const roomId = action.target as import("./types.js").RoomId;
-    const msg = await this.store.sendRoomMessage(roomId, ctx.agentId, action.content, action.replyTo);
+    const msg = await this.store.sendRoomMessage(
+      roomId,
+      ctx.agentId,
+      action.content,
+      action.replyTo,
+    );
     return {
       content: `Sent to ${action.target}: ${msg.id}`,
       isError: false,
@@ -201,7 +221,8 @@ export class BusTool {
 
   private async listAgents(ctx: ToolContext): Promise<ToolResult> {
     const agents = await this.store.listAgents(ctx.agentId);
-    if (agents.length === 0) return { content: "No other agents online.", isError: false };
+    if (agents.length === 0)
+      return { content: "No other agents online.", isError: false };
 
     const lines = agents.map((a: AgentIdentity) => {
       const self = a.id === ctx.agentId ? " (you)" : "";
@@ -219,7 +240,8 @@ export class BusTool {
   ): Promise<ToolResult> {
     const roomId = action.room as import("./types.js").RoomId;
     const messages = await this.store.readRoomMessages(roomId, action.since);
-    if (messages.length === 0) return { content: "No messages.", isError: false };
+    if (messages.length === 0)
+      return { content: "No messages.", isError: false };
 
     const lines = messages.map((m: RoomMessage) => {
       const time = m.timestamp.slice(11, 19);
@@ -237,7 +259,10 @@ export class BusTool {
       action.agent as import("./types.js").AgentId,
       ctx.agentId,
     );
-    return { content: `Invited ${action.agent} to ${action.room}.`, isError: false };
+    return {
+      content: `Invited ${action.agent} to ${action.room}.`,
+      isError: false,
+    };
   }
 
   private async kick(
@@ -249,14 +274,20 @@ export class BusTool {
       action.agent as import("./types.js").AgentId,
       ctx.agentId,
     );
-    return { content: `Kicked ${action.agent} from ${action.room}.`, isError: false };
+    return {
+      content: `Kicked ${action.agent} from ${action.room}.`,
+      isError: false,
+    };
   }
 
   private async destroyRoom(
     ctx: ToolContext,
     action: BusAction & { action: "destroy_room" },
   ): Promise<ToolResult> {
-    await this.store.destroyRoom(action.room as import("./types.js").RoomId, ctx.agentId);
+    await this.store.destroyRoom(
+      action.room as import("./types.js").RoomId,
+      ctx.agentId,
+    );
     return { content: `Destroyed room "${action.room}".`, isError: false };
   }
 }

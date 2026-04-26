@@ -1,5 +1,5 @@
 /**
- * Agent Bus — shared bridge helpers.
+ * Agent Comms — shared bridge helpers.
  *
  * Every bridge needs the same three things:
  *   1. Build a BusAction from flat tool parameters
@@ -11,39 +11,93 @@
  */
 
 import * as fs from "node:fs/promises";
-import type { AgentId, BusAction, DeliveryEvent, Visibility } from "./types.js";
+import type { BusAction, DeliveryEvent, Visibility } from "./types.js";
 import { BusStore } from "./store.js";
 import { nanoid } from "./nanoid.js";
+
+// ---------------------------------------------------------------------------
+// Narrowing helpers for params from MCP/pi tool calls
+// ---------------------------------------------------------------------------
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function getString(
+  params: Record<string, unknown>,
+  key: string,
+  fallback: string,
+): string {
+  const value = params[key];
+  return isString(value) ? value : fallback;
+}
+
+function getOptionalString(
+  params: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = params[key];
+  return isString(value) ? value : undefined;
+}
+
+function getOptionalStringArray(
+  params: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  const value = params[key];
+  return isStringArray(value) ? value : undefined;
+}
+
+function getOptionalEnum<T extends string>(
+  params: Record<string, unknown>,
+  key: string,
+  values: readonly T[],
+): T | undefined {
+  const value = params[key];
+  if (isString(value) && (values as readonly string[]).includes(value)) {
+    return value as T;
+  }
+  return undefined;
+}
 
 // ---------------------------------------------------------------------------
 // buildAction — flat params → typed BusAction
 // ---------------------------------------------------------------------------
 
-/**
- * Convert flat key-value params (as received from an MCP tool call or
- * pi registerTool) into a discriminated BusAction.
- *
- * Uses explicit presence checks to satisfy exactOptionalPropertyTypes.
- */
+const VISIBILITY_VALUES = ["visible", "hidden", "ghost"] as const;
+const STATUS_VALUES = ["active", "idle", "busy"] as const;
+const ROOM_TYPE_VALUES = ["public", "private", "secret"] as const;
+
 export function buildAction(params: Record<string, unknown>): BusAction {
-  switch (params.action) {
+  const action = isString(params.action) ? params.action : "whoami";
+
+  switch (action) {
     case "register":
       return {
         action: "register",
-        name: (params.name as string) ?? "unnamed",
-        visibility: (params.visibility as Visibility) ?? "visible",
-        tags: (params.tags as string[]) ?? [],
+        name: getString(params, "name", "unnamed"),
+        visibility:
+          getOptionalEnum(params, "visibility", VISIBILITY_VALUES) ?? "visible",
+        tags: getOptionalStringArray(params, "tags") ?? [],
       };
     case "update": {
       const update: BusAction & { action: "update" } = { action: "update" };
-      if ("visibility" in params && params.visibility !== undefined)
-        update.visibility = params.visibility as Visibility;
-      if ("status" in params && params.status !== undefined)
-        update.status = params.status as "active" | "idle" | "busy";
-      if ("name" in params && params.name !== undefined)
-        update.name = params.name as string;
-      if ("tags" in params && params.tags !== undefined)
-        update.tags = params.tags as string[];
+      const visibility = getOptionalEnum(
+        params,
+        "visibility",
+        VISIBILITY_VALUES,
+      );
+      if (visibility !== undefined) update.visibility = visibility;
+      const status = getOptionalEnum(params, "status", STATUS_VALUES);
+      if (status !== undefined) update.status = status;
+      const name = getOptionalString(params, "name");
+      if (name !== undefined) update.name = name;
+      const tags = getOptionalStringArray(params, "tags");
+      if (tags !== undefined) update.tags = tags;
       return update;
     }
     case "whoami":
@@ -51,57 +105,62 @@ export function buildAction(params: Record<string, unknown>): BusAction {
     case "create_room":
       return {
         action: "create_room",
-        name: (params.room as string) ?? "unnamed",
-        type: (params.type as "public" | "private" | "secret") ?? "public",
-        description: (params.description as string) ?? "",
+        name: getString(params, "room", "unnamed"),
+        type: getOptionalEnum(params, "type", ROOM_TYPE_VALUES) ?? "public",
+        description: getString(params, "description", ""),
       };
     case "list_rooms":
       return { action: "list_rooms" };
     case "join_room":
-      return { action: "join_room", room: (params.room as string) ?? "" };
+      return { action: "join_room", room: getString(params, "room", "") };
     case "leave_room":
-      return { action: "leave_room", room: (params.room as string) ?? "" };
+      return { action: "leave_room", room: getString(params, "room", "") };
     case "send": {
       const send: BusAction & { action: "send" } = {
         action: "send",
-        target: (params.target as string) ?? (params.room as string) ?? "",
-        content: (params.content as string) ?? "",
+        target:
+          getString(params, "target", "") || getString(params, "room", ""),
+        content: getString(params, "content", ""),
       };
-      if ("replyTo" in params && params.replyTo !== undefined)
-        send.replyTo = params.replyTo as string;
+      const replyTo = getOptionalString(params, "replyTo");
+      if (replyTo !== undefined) send.replyTo = replyTo;
       return send;
     }
     case "dm":
       return {
         action: "dm",
-        target: (params.target as string) ?? (params.agent as string) ?? "",
-        content: (params.content as string) ?? "",
+        target:
+          getString(params, "target", "") || getString(params, "agent", ""),
+        content: getString(params, "content", ""),
       };
     case "list_agents":
       return { action: "list_agents" };
     case "read_room": {
       const read: BusAction & { action: "read_room" } = {
         action: "read_room",
-        room: (params.room as string) ?? "",
+        room: getString(params, "room", ""),
       };
-      if ("since" in params && params.since !== undefined)
-        read.since = params.since as string;
+      const since = getOptionalString(params, "since");
+      if (since !== undefined) read.since = since;
       return read;
     }
     case "invite":
       return {
         action: "invite",
-        room: (params.room as string) ?? "",
-        agent: (params.agent as string) ?? "",
+        room: getString(params, "room", ""),
+        agent: getString(params, "agent", ""),
       };
     case "kick":
       return {
         action: "kick",
-        room: (params.room as string) ?? "",
-        agent: (params.agent as string) ?? "",
+        room: getString(params, "room", ""),
+        agent: getString(params, "agent", ""),
       };
     case "destroy_room":
-      return { action: "destroy_room", room: (params.room as string) ?? "" };
+      return {
+        action: "destroy_room",
+        room: getString(params, "room", ""),
+      };
     default:
       return { action: "whoami" };
   }
@@ -131,7 +190,7 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
 // ---------------------------------------------------------------------------
 
 export interface RegistrationResult {
-  agentId: AgentId;
+  agentId: string;
   store: BusStore;
   isNew: boolean;
 }
@@ -174,7 +233,7 @@ export async function ensureRegistered(opts: {
 
 export async function drainAndFormat(
   store: BusStore,
-  agentId: AgentId,
+  agentId: string,
 ): Promise<string[]> {
   const events = await store.drainDelivery(agentId);
   return events.map(formatDeliveryEvent);
@@ -190,10 +249,20 @@ export const MCP_TOOL_SCHEMA = {
     action: {
       type: "string" as const,
       enum: [
-        "register", "update", "whoami",
-        "create_room", "list_rooms", "join_room", "leave_room",
-        "send", "dm", "list_agents", "read_room",
-        "invite", "kick", "destroy_room",
+        "register",
+        "update",
+        "whoami",
+        "create_room",
+        "list_rooms",
+        "join_room",
+        "leave_room",
+        "send",
+        "dm",
+        "list_agents",
+        "read_room",
+        "invite",
+        "kick",
+        "destroy_room",
       ],
       description: "Action to perform",
     },
@@ -223,7 +292,10 @@ export const MCP_TOOL_SCHEMA = {
     target: { type: "string" as const, description: "Target room or agent ID" },
     content: { type: "string" as const, description: "Message content" },
     agent: { type: "string" as const, description: "Target agent ID" },
-    since: { type: "string" as const, description: "ISO timestamp for read_room" },
+    since: {
+      type: "string" as const,
+      description: "ISO timestamp for read_room",
+    },
   },
   required: ["action"],
 } as const;

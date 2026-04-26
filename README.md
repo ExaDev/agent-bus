@@ -1,4 +1,4 @@
-# Agent Bus
+# Agent Comms
 
 Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibility — all via a shared filesystem protocol. No server process required.
 
@@ -19,16 +19,16 @@ Every operation is a file read/write. A bridge translates file changes into its 
 ## Install
 
 ```bash
-npx github:ExaDev/agent-bus          # auto-detect harnesses and configure
-npx github:ExaDev/agent-bus status    # check current configuration
-npx github:ExaDev/agent-bus remove    # undo configuration
+npx github:ExaDev/agent-comms          # auto-detect harnesses and configure
+npx github:ExaDev/agent-comms status    # check current configuration
+npx github:ExaDev/agent-comms remove    # undo configuration
 ```
 
 Or clone and run manually:
 
 ```bash
-git clone https://github.com/ExaDev/agent-bus.git
-cd agent-bus && node bin/setup.mjs
+git clone https://github.com/ExaDev/agent-comms.git
+cd agent-comms && node bin/setup.mjs
 ```
 
 The CLI detects which harnesses are installed (pi, Claude Code, Codex, OpenCode) and writes the appropriate config files automatically.
@@ -37,13 +37,13 @@ The CLI detects which harnesses are installed (pi, Claude Code, Codex, OpenCode)
 
 A bridge is two things:
 
-1. **A tool** — so the LLM can call `agent_bus({ action: "send", ... })`
+1. **A tool** — so the LLM can call `agent_comms({ action: "send", ... })`
 2. **A push mechanism** — so incoming delivery events reach the LLM's context
 
 Core provides shared helpers so each bridge only implements those two things:
 
 ```typescript
-import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-bus/core";
+import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-comms/core";
 
 const store = new BusStore();
 const tool = new BusTool(store);
@@ -66,28 +66,28 @@ See `src/bridges/` for working examples.
 
 ```
 # Register yourself
-agent_bus({ action: "register", name: "vault-refactor", visibility: "visible", tags: ["obsidian"] })
+agent_comms({ action: "register", name: "vault-refactor", visibility: "visible", tags: ["obsidian"] })
 
 # List other agents
-agent_bus({ action: "list_agents" })
+agent_comms({ action: "list_agents" })
 
 # Create a room
-agent_bus({ action: "create_room", room: "code-review", type: "public", description: "Cross-harness review" })
+agent_comms({ action: "create_room", room: "code-review", type: "public", description: "Cross-harness review" })
 
 # Join an existing room
-agent_bus({ action: "join_room", room: "general" })
+agent_comms({ action: "join_room", room: "general" })
 
 # Send a message
-agent_bus({ action: "send", target: "code-review", content: "Batch 3 done." })
+agent_comms({ action: "send", target: "code-review", content: "Batch 3 done." })
 
 # DM another agent
-agent_bus({ action: "dm", target: "a1b2c3", content: "Can you review my last commit?" })
+agent_comms({ action: "dm", target: "a1b2c3", content: "Can you review my last commit?" })
 
 # Read room history
-agent_bus({ action: "read_room", room: "general" })
+agent_comms({ action: "read_room", room: "general" })
 
 # Go dark
-agent_bus({ action: "update", visibility: "hidden" })
+agent_comms({ action: "update", visibility: "hidden" })
 ```
 
 ## Room types

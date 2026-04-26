@@ -1,11 +1,11 @@
 /**
- * Agent Bus — Codex Stop hook.
+ * Agent Comms — Codex Stop hook.
  *
- * Drains the agent-bus delivery queue when Codex finishes a turn.
+ * Drains the agent-comms delivery queue when Codex finishes a turn.
  * If pending messages exist, returns decision=block with the messages
  * as the reason, causing Codex to continue processing them immediately.
  *
- * Run via: npx agent-bus bridge codex-stop
+ * Run via: npx agent-comms bridge codex-stop
  *
  * Requires [features] codex_hooks = true in config.toml.
  */
@@ -13,19 +13,23 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { DeliveryEventSchema } from "../../core/types.js";
 import type { DeliveryEvent } from "../../core/types.js";
 
 const BUS_ROOT = path.join(os.homedir(), ".agents", "bus");
 const IDENTITY_FILE = path.join(BUS_ROOT, "identity.json");
 
-interface Identity {
-  id: string;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function readIdentity(): string | undefined {
   try {
-    const data = JSON.parse(fs.readFileSync(IDENTITY_FILE, "utf-8")) as Identity;
-    return data.id;
+    const parsed: unknown = JSON.parse(fs.readFileSync(IDENTITY_FILE, "utf-8"));
+    if (isRecord(parsed) && typeof parsed.id === "string") {
+      return parsed.id;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -34,20 +38,26 @@ function readIdentity(): string | undefined {
 function drainDelivery(agentId: string): DeliveryEvent[] {
   const deliveryDir = path.join(BUS_ROOT, "delivery", agentId);
   try {
-    const files = fs.readdirSync(deliveryDir).filter(f => f.endsWith(".json")).sort();
+    const files = fs
+      .readdirSync(deliveryDir)
+      .filter((f) => f.endsWith(".json"))
+      .sort();
     const events: DeliveryEvent[] = [];
     for (const file of files) {
       const fp = path.join(deliveryDir, file);
       try {
-        events.push(JSON.parse(fs.readFileSync(fp, "utf-8")) as DeliveryEvent);
+        const parsed: unknown = JSON.parse(fs.readFileSync(fp, "utf-8"));
+        events.push(DeliveryEventSchema.parse(parsed));
         fs.unlinkSync(fp);
       } catch {
         fs.unlinkSync(fp);
       }
     }
     events.sort((a, b) => {
-      const ta = "message" in a ? (a.message as { timestamp: string }).timestamp : "";
-      const tb = "message" in b ? (b.message as { timestamp: string }).timestamp : "";
+      const ta =
+        a.type === "room_message" || a.type === "dm" ? a.message.timestamp : "";
+      const tb =
+        b.type === "room_message" || b.type === "dm" ? b.message.timestamp : "";
       return ta.localeCompare(tb);
     });
     return events;
@@ -76,8 +86,11 @@ const chunks: string[] = [];
 process.stdin.setEncoding("utf-8");
 process.stdin.on("data", (chunk: string) => chunks.push(chunk));
 process.stdin.on("end", () => {
-  // Parse hook input (we don't need it, but Codex sends it)
-  try { JSON.parse(chunks.join("")); } catch { /* no input, fine */ }
+  try {
+    JSON.parse(chunks.join(""));
+  } catch {
+    /* no input, fine */
+  }
 
   const agentId = readIdentity();
   if (!agentId) process.exit(0);
@@ -86,7 +99,10 @@ process.stdin.on("end", () => {
   if (events.length === 0) process.exit(0);
 
   const lines = events.map(formatEvent);
-  const message = "📬 Agent Bus pending messages:\n" + lines.map(l => `- ${l}`).join("\n");
+  const message =
+    "📬 Agent Comms pending messages:\n" + lines.map((l) => `- ${l}`).join("\n");
 
-  process.stdout.write(JSON.stringify({ decision: "block", reason: message }, null, 2) + "\n");
+  process.stdout.write(
+    JSON.stringify({ decision: "block", reason: message }, null, 2) + "\n",
+  );
 });
