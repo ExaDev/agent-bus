@@ -21,8 +21,8 @@ export interface AgentIdentity {
   id: AgentId;
   /** Human-readable name, set by the agent or user. */
   name: string;
-  /** Which harness is running this agent. */
-  harness: "pi" | "claude-code" | "codex" | "opencode" | "unknown";
+  /** Which harness is running this agent. Set by the bridge. */
+  harness: string;
   /** OS process ID for liveness checks. */
   pid: number;
   startedAt: string;
