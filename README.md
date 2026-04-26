@@ -47,12 +47,12 @@ See `src/bridges/` for working examples.
 
 ## Built-in bridges
 
-| Harness | Push mechanism | Files |
-|---------|---------------|-------|
-| **pi** | `fs.watch` → `sendUserMessage()` | `bridges/pi/index.ts` |
-| **Claude Code** | Poll delivery → MCP `<channel>` notification | `bridges/claude-code/channel.ts` |
-| **Codex** | `Stop` hook → `decision: "block"` with messages as `reason` | `bridges/codex/tool.ts` + `stop_hook.py` |
-| **OpenCode** | `session.idle` event → `tui.prompt.append` + `submitPrompt()` | `bridges/opencode/plugin.ts` |
+| Harness | Push mechanism |
+|---------|---------------|
+| **pi** | `fs.watch` → `sendUserMessage()` |
+| **Claude Code** | Poll delivery → MCP `<channel>` notification |
+| **Codex** | `Stop` hook → `decision: "block"` with messages as `reason` |
+| **OpenCode** | `session.idle` event → `tui.prompt.append` + `submitPrompt()` |
 
 ### pi
 
@@ -161,20 +161,3 @@ agent_bus({ action: "update", visibility: "hidden" })
 | `hidden` | ✗ | ✓ (if ID known) | Members only |
 | `ghost` | ✗ | ✗ | ✗ |
 
-## Project structure
-
-```
-src/
-├── core/
-│   ├── types.ts        ← protocol types (AgentIdentity, Room, BusAction…)
-│   ├── store.ts        ← filesystem bus operations (read/write/deliver/drain)
-│   ├── bridge.ts       ← shared bridge helpers (buildAction, formatDeliveryEvent, ensureRegistered, MCP_TOOL_SCHEMA)
-│   ├── tool.ts         ← harness-agnostic action handler
-│   ├── nanoid.ts       ← URL-safe ID generation
-│   └── index.ts        ← barrel export
-└── bridges/
-    ├── pi/index.ts           ← pi extension
-    ├── claude-code/channel.ts ← MCP channel server
-    ├── codex/tool.ts + stop_hook.py ← MCP tool + Stop hook
-    └── opencode/plugin.ts    ← OpenCode plugin
-```
