@@ -45,6 +45,14 @@ for (const line of lines) await yourHarness.push(`📬 ${line}`);
 
 See `src/bridges/` for working examples.
 
+## Install
+
+```bash
+git clone https://github.com/ExaDev/agent-bus.git
+```
+
+Below, `AGENT_BUS_DIR` refers to wherever you cloned it.
+
 ## Built-in bridges
 
 | Harness | Push mechanism |
@@ -58,7 +66,7 @@ See `src/bridges/` for working examples.
 
 ```bash
 mkdir -p ~/.pi/agent/extensions/agent-bus
-ln -s ~/Developer/agent-bus/src/bridges/pi/index.ts ~/.pi/agent/extensions/agent-bus/index.ts
+ln -s $AGENT_BUS_DIR/src/bridges/pi/index.ts ~/.pi/agent/extensions/agent-bus/index.ts
 ```
 
 ### Claude Code
@@ -70,7 +78,7 @@ Add to `.mcp.json`:
   "mcpServers": {
     "agent-bus": {
       "command": "bun",
-      "args": ["~/Developer/agent-bus/src/bridges/claude-code/channel.ts"]
+      "args": ["$AGENT_BUS_DIR/src/bridges/claude-code/channel.ts"]
     }
   }
 }
@@ -85,7 +93,7 @@ Run with channels enabled: `claude --dangerously-load-development-channels`
 ```toml
 [mcp_servers.agent-bus]
 command = "node"
-args = ["--experimental-strip-types", "~/Developer/agent-bus/src/bridges/codex/tool.ts"]
+args = ["--experimental-strip-types", "$AGENT_BUS_DIR/src/bridges/codex/tool.ts"]
 ```
 
 **Stop hook** — add to `~/.codex/hooks.json` (requires `codex_hooks = true` in config):
@@ -96,7 +104,7 @@ args = ["--experimental-strip-types", "~/Developer/agent-bus/src/bridges/codex/t
     "Stop": [{
       "hooks": [{
         "type": "command",
-        "command": "python3 ~/Developer/agent-bus/src/bridges/codex/stop_hook.py",
+        "command": "python3 $AGENT_BUS_DIR/src/bridges/codex/stop_hook.py",
         "timeout": 5
       }]
     }]
@@ -109,10 +117,10 @@ args = ["--experimental-strip-types", "~/Developer/agent-bus/src/bridges/codex/t
 ```bash
 # Project-level
 mkdir -p .opencode/plugins
-ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts .opencode/plugins/agent-bus.ts
+ln -s $AGENT_BUS_DIR/src/bridges/opencode/plugin.ts .opencode/plugins/agent-bus.ts
 
 # Or global
-ln -s ~/Developer/agent-bus/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-bus.ts
+ln -s $AGENT_BUS_DIR/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-bus.ts
 ```
 
 Add to `.opencode/package.json`: `{ "dependencies": { "@opencode-ai/plugin": "*" } }`
