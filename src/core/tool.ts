@@ -64,7 +64,7 @@ export class BusTool {
           return await this.destroyRoom(ctx, action);
         default:
           return {
-            content: `Unknown action: ${(action as { action: string }).action}`,
+            content: `Unknown action: ${JSON.stringify(action).slice(0, 100)}`,
             isError: true,
           };
       }
@@ -159,7 +159,7 @@ export class BusTool {
 
     const lines = rooms.map((r: Room) => {
       const memberFlag = r.members.includes(ctx.agentId) ? "✓" : " ";
-      return `[${memberFlag}] ${r.type.padEnd(7)} ${r.name} (${r.members.length} members) — ${r.description}`;
+      return `[${memberFlag}] ${r.type.padEnd(7)} ${r.name} (${String(r.members.length)} members) — ${r.description}`;
     });
     return {
       content: `Rooms ([✓] = joined):\n${lines.join("\n")}`,
@@ -171,10 +171,10 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "join_room" },
   ): Promise<ToolResult> {
-    const roomId = action.room as import("./types.js").RoomId;
+    const roomId = action.room;
     const room = await this.store.joinRoom(roomId, ctx.agentId);
     return {
-      content: `Joined room "${room.name}" (${room.members.length} members).`,
+      content: `Joined room "${room.name}" (${String(room.members.length)} members).`,
       isError: false,
     };
   }
@@ -183,10 +183,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "leave_room" },
   ): Promise<ToolResult> {
-    await this.store.leaveRoom(
-      action.room as import("./types.js").RoomId,
-      ctx.agentId,
-    );
+    await this.store.leaveRoom(action.room, ctx.agentId);
     return { content: `Left room "${action.room}".`, isError: false };
   }
 
@@ -194,7 +191,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "send" },
   ): Promise<ToolResult> {
-    const roomId = action.target as import("./types.js").RoomId;
+    const roomId = action.target;
     const msg = await this.store.sendRoomMessage(
       roomId,
       ctx.agentId,
@@ -211,7 +208,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "dm" },
   ): Promise<ToolResult> {
-    const targetId = action.target as import("./types.js").AgentId;
+    const targetId = action.target;
     const msg = await this.store.sendDm(ctx.agentId, targetId, action.content);
     return {
       content: `DM sent to ${action.target}: ${msg.id}`,
@@ -238,7 +235,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "read_room" },
   ): Promise<ToolResult> {
-    const roomId = action.room as import("./types.js").RoomId;
+    const roomId = action.room;
     const messages = await this.store.readRoomMessages(roomId, action.since);
     if (messages.length === 0)
       return { content: "No messages.", isError: false };
@@ -254,11 +251,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "invite" },
   ): Promise<ToolResult> {
-    await this.store.inviteToRoom(
-      action.room as import("./types.js").RoomId,
-      action.agent as import("./types.js").AgentId,
-      ctx.agentId,
-    );
+    await this.store.inviteToRoom(action.room, action.agent, ctx.agentId);
     return {
       content: `Invited ${action.agent} to ${action.room}.`,
       isError: false,
@@ -269,11 +262,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "kick" },
   ): Promise<ToolResult> {
-    await this.store.kickFromRoom(
-      action.room as import("./types.js").RoomId,
-      action.agent as import("./types.js").AgentId,
-      ctx.agentId,
-    );
+    await this.store.kickFromRoom(action.room, action.agent, ctx.agentId);
     return {
       content: `Kicked ${action.agent} from ${action.room}.`,
       isError: false,
@@ -284,10 +273,7 @@ export class BusTool {
     ctx: ToolContext,
     action: BusAction & { action: "destroy_room" },
   ): Promise<ToolResult> {
-    await this.store.destroyRoom(
-      action.room as import("./types.js").RoomId,
-      ctx.agentId,
-    );
+    await this.store.destroyRoom(action.room, ctx.agentId);
     return { content: `Destroyed room "${action.room}".`, isError: false };
   }
 }

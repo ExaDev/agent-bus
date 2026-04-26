@@ -10,6 +10,12 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { nanoid } from "./nanoid.js";
+
+/** Swallow expected filesystem errors (e.g. file already deleted). */
+function swallow(_error: unknown): void {
+  /* intentionally empty — expected failure */
+}
+
 import {
   AgentIdentitySchema,
   DeliveryEventSchema,
@@ -17,12 +23,10 @@ import {
   RoomSchema,
 } from "./types.js";
 import type {
-  AgentId,
   AgentIdentity,
   DeliveryEvent,
   DmMessage,
   Room,
-  RoomId,
   RoomMessage,
   RoomType,
   Visibility,
@@ -69,7 +73,9 @@ export class BusStore {
 
   dmDir(a: string, b: string): string {
     const sorted = [a, b].sort();
-    return path.join(this.root, "dms", `${sorted[0]}--${sorted[1]}`);
+    const first = sorted[0] ?? a;
+    const second = sorted[1] ?? b;
+    return path.join(this.root, "dms", `${first}--${second}`);
   }
 
   deliveryDir(id: string): string {
@@ -102,7 +108,8 @@ export class BusStore {
     try {
       const raw = await this.readJsonFile(this.identityPath());
       if (typeof raw === "object" && raw !== null && "id" in raw) {
-        return { id: String((raw as Record<string, unknown>).id) };
+        const id = raw.id;
+        if (typeof id === "string") return { id };
       }
       return undefined;
     } catch {
@@ -382,10 +389,10 @@ export class BusStore {
       }
     }
 
-    await fs.unlink(this.roomPath(roomId)).catch(() => {});
+    await fs.unlink(this.roomPath(roomId)).catch(swallow);
     await fs
       .rm(this.roomMessagesDir(roomId), { recursive: true })
-      .catch(() => {});
+      .catch(swallow);
   }
 
   // -------------------------------------------------------------------------
@@ -403,7 +410,7 @@ export class BusStore {
     if (!room.members.includes(from))
       throw new BusError(`Not a member of ${roomId}`, "NOT_MEMBER");
 
-    const id = `${Date.now()}-${nanoid(6)}`;
+    const id = `${String(Date.now())}-${nanoid(6)}`;
     const message: RoomMessage = {
       id,
       from,
@@ -465,7 +472,7 @@ export class BusStore {
         throw new BusError(`Cannot DM agent ${to}`, "AGENT_NOT_FOUND");
     }
 
-    const id = `${Date.now()}-${nanoid(6)}`;
+    const id = `${String(Date.now())}-${nanoid(6)}`;
     const message: DmMessage = {
       id,
       from,
@@ -490,7 +497,7 @@ export class BusStore {
   async deliver(agentId: string, event: DeliveryEvent): Promise<void> {
     const dir = this.deliveryDir(agentId);
     await fs.mkdir(dir, { recursive: true });
-    const id = `${Date.now()}-${nanoid(6)}`;
+    const id = `${String(Date.now())}-${nanoid(6)}`;
     await this.writeJsonFile(path.join(dir, `${id}.json`), event);
   }
 

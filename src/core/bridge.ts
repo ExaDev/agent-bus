@@ -10,10 +10,8 @@
  * push mechanism and tool registration.
  */
 
-import * as fs from "node:fs/promises";
 import type { BusAction, DeliveryEvent, Visibility } from "./types.js";
 import { BusStore } from "./store.js";
-import { nanoid } from "./nanoid.js";
 
 // ---------------------------------------------------------------------------
 // Narrowing helpers for params from MCP/pi tool calls
@@ -58,8 +56,9 @@ function getOptionalEnum<T extends string>(
   values: readonly T[],
 ): T | undefined {
   const value = params[key];
-  if (isString(value) && (values as readonly string[]).includes(value)) {
-    return value as T;
+  if (!isString(value)) return undefined;
+  for (const v of values) {
+    if (v === value) return v;
   }
   return undefined;
 }

@@ -27,7 +27,7 @@ const PiSettingsSchema = z
   .object({
     extensions: z.array(z.string()).optional(),
   })
-  .passthrough();
+  .loose();
 
 const McpServersSchema = z
   .object({
@@ -38,10 +38,10 @@ const McpServersSchema = z
           command: z.string(),
           args: z.array(z.string()).optional(),
         })
-        .passthrough(),
+        .loose(),
     ),
   })
-  .passthrough();
+  .loose();
 
 const HooksSchema = z
   .object({
@@ -59,23 +59,23 @@ const HooksSchema = z
                         command: z.string(),
                         timeout: z.number().optional(),
                       })
-                      .passthrough(),
+                      .loose(),
                   )
                   .optional(),
               })
-              .passthrough(),
+              .loose(),
           )
           .optional(),
       })
       .optional(),
   })
-  .passthrough();
+  .loose();
 
 const OpenCodeConfigSchema = z
   .object({
     plugin: z.array(z.string()).optional(),
   })
-  .passthrough();
+  .loose();
 
 // ---------------------------------------------------------------------------
 // Config I/O
@@ -281,7 +281,9 @@ function setup(): void {
   }
 
   const plural = detected.length === 1 ? "" : "es";
-  console.log(`\n✓ Done! ${detected.length} harness${plural} configured.`);
+  console.log(
+    `\n✓ Done! ${String(detected.length)} harness${plural} configured.`,
+  );
   console.log("\nBridges run via: npx agent-comms bridge <id>");
 }
 
@@ -292,7 +294,7 @@ function status(): void {
     const installed = h.detect();
     const result = installed
       ? h.check()
-      : { configured: false, details: [] as string[] };
+      : { configured: false, details: Array<string>() };
 
     if (!installed) {
       console.log(`  ✗ ${h.id} — not found`);
@@ -409,7 +411,7 @@ function checkClaudeCode(): CheckResult {
   return {
     configured,
     details: configured
-      ? [`Config: ${mcpPath}`, `Command: ${String(entry.command)}`]
+      ? [`Config: ${mcpPath}`, `Command: ${entry.command}`]
       : [`Not in ${mcpPath}`],
   };
 }
@@ -462,7 +464,6 @@ function configureCodex(): void {
   };
 
   const stopHooks = hooks.hooks?.Stop ?? [{ hooks: [] }];
-  if (!stopHooks[0]) stopHooks[0] = { hooks: [] };
   const innerHooks = stopHooks[0].hooks ?? [];
 
   const alreadyHasHook = innerHooks.some((h) =>
@@ -488,7 +489,8 @@ function removeCodex(): void {
     const lines = content
       .split("\n")
       .filter(
-        (line) => !line.includes("agent-comms") && !line.includes("Agent Comms"),
+        (line) =>
+          !line.includes("agent-comms") && !line.includes("Agent Comms"),
       );
     fs.writeFileSync(tomlPath, lines.join("\n").trimEnd() + "\n");
     console.log(`  Removed agent-comms from ${tomlPath}`);

@@ -19,6 +19,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as path from "node:path";
 import * as os from "node:os";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 import {
   BusStore,
   BusTool,
@@ -27,7 +31,6 @@ import {
   drainAndFormat,
   MCP_TOOL_SCHEMA,
 } from "../../core/index.js";
-import type { AgentId } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
 const store = new BusStore(path.join(os.homedir(), ".agents", "bus"));
@@ -51,17 +54,21 @@ const mcp = new McpServer(
 // Tool registration
 // ---------------------------------------------------------------------------
 
-mcp.tool(
+mcp.registerTool(
   "agent_comms",
-  [
-    "Cross-harness agent communication bus. Actions:",
-    "register, update, whoami, create_room, list_rooms, join_room, leave_room,",
-    "send, dm, list_agents, read_room, invite, kick, destroy_room.",
-    'Incoming messages appear as <channel source="agent-comms"> events.',
-  ].join(" "),
-  MCP_TOOL_SCHEMA,
-  async (params) => {
-    if (!agentId && params.action !== "register") {
+  {
+    description: [
+      "Cross-harness agent communication bus. Actions:",
+      "register, update, whoami, create_room, list_rooms, join_room, leave_room,",
+      "send, dm, list_agents, read_room, invite, kick, destroy_room.",
+      'Incoming messages appear as <channel source="agent-comms"> events.',
+    ].join(" "),
+    inputSchema: MCP_TOOL_SCHEMA,
+  },
+  async (rawParams: unknown) => {
+    const params = isRecord(rawParams) ? rawParams : {};
+    const actionParam = params.action;
+    if (!agentId && actionParam !== "register") {
       const reg = await ensureRegistered({
         store,
         harness: "claude-code",
@@ -97,16 +104,20 @@ mcp.tool(
 
 function startDeliveryPoll() {
   if (watchTimer) return;
-  watchTimer = setInterval(async () => {
-    if (!agentId) return;
-    const lines = await drainAndFormat(store, agentId);
-    for (const line of lines) {
-      await mcp.server.notification({
-        method: "notifications/claude/channel",
-        params: { content: line, meta: {} },
-      });
-    }
+  watchTimer = setInterval(() => {
+    void pollDelivery();
   }, 2000);
+}
+
+async function pollDelivery() {
+  if (!agentId) return;
+  const lines = await drainAndFormat(store, agentId);
+  for (const line of lines) {
+    await mcp.server.notification({
+      method: "notifications/claude/channel",
+      params: { content: line, meta: {} },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

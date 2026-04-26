@@ -100,7 +100,8 @@ process.stdin.on("end", () => {
 
   const lines = events.map(formatEvent);
   const message =
-    "📬 Agent Comms pending messages:\n" + lines.map((l) => `- ${l}`).join("\n");
+    "📬 Agent Comms pending messages:\n" +
+    lines.map((l) => `- ${l}`).join("\n");
 
   process.stdout.write(
     JSON.stringify({ decision: "block", reason: message }, null, 2) + "\n",

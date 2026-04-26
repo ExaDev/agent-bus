@@ -84,11 +84,7 @@ const customPlugin = {
 
 export default defineConfig(
   {
-    ignores: [
-      "**/dist/**",
-      "**/node_modules/**",
-      "**/pnpm-lock.yaml",
-    ],
+    ignores: ["**/dist/**", "**/node_modules/**", "**/pnpm-lock.yaml"],
   },
   {
     files: ["**/*.{ts,tsx}"],
@@ -108,7 +104,10 @@ export default defineConfig(
       custom: customPlugin,
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_" },
+      ],
       "@typescript-eslint/consistent-type-assertions": [
         "error",
         { assertionStyle: "never" },

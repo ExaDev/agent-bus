@@ -68,9 +68,9 @@ export default function (pi: ExtensionAPI) {
     const deliveryDir = store.deliveryDir(agentId);
     fs.mkdirSync(deliveryDir, { recursive: true });
 
-    watcher = fs.watch(deliveryDir, async (event, filename) => {
+    watcher = fs.watch(deliveryDir, (event, filename) => {
       if (event !== "rename" || !filename?.endsWith(".json")) return;
-      await drainAndPush();
+      void drainAndPush();
     });
   }
 
