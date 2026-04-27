@@ -49,7 +49,7 @@
   "devDependencies": {
     "@eslint/json": "1.2.0",
     "@eslint/markdown": "8.0.1",
-    "@mariozechner/pi-ai": "0.69.0",
+    "@mariozechner/pi-ai": "0.70.2",
     "@mariozechner/pi-coding-agent": "0.69.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@semantic-release/commit-analyzer": "13.0.1",
