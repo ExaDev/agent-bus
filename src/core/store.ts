@@ -31,26 +31,27 @@ import type {
   RoomType,
   Visibility,
 } from "./types.js";
+import type { CommsStore } from "./comms-store.js";
 
 // ---------------------------------------------------------------------------
-// BusError
+// CommsError
 // ---------------------------------------------------------------------------
 
-export class BusError extends Error {
+export class CommsError extends Error {
   constructor(
     message: string,
     public readonly code: string,
   ) {
     super(message);
-    this.name = "BusError";
+    this.name = "CommsError";
   }
 }
 
 // ---------------------------------------------------------------------------
-// BusStore
+// FileStore
 // ---------------------------------------------------------------------------
 
-export class BusStore {
+export class FileStore implements CommsStore {
   constructor(
     public readonly root: string = path.join(os.homedir(), ".agents", "bus"),
   ) {}
@@ -183,7 +184,8 @@ export class BusStore {
     >,
   ): Promise<AgentIdentity> {
     const agent = await this.getAgent(id);
-    if (!agent) throw new BusError(`Agent ${id} not found`, "AGENT_NOT_FOUND");
+    if (!agent)
+      throw new CommsError(`Agent ${id} not found`, "AGENT_NOT_FOUND");
 
     Object.assign(agent, patch);
     await this.writeJsonFile(this.agentPath(id), agent);
@@ -230,7 +232,7 @@ export class BusStore {
     const id = opts.type === "secret" ? `_${opts.name}` : opts.name;
     const existing = await this.getRoom(id);
     if (existing)
-      throw new BusError(`Room ${id} already exists`, "ROOM_EXISTS");
+      throw new CommsError(`Room ${id} already exists`, "ROOM_EXISTS");
 
     const room: Room = {
       id,
@@ -278,7 +280,8 @@ export class BusStore {
 
   async joinRoom(roomId: string, agentId: string): Promise<Room> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
 
     if (room.type === "public") {
       if (!room.members.includes(agentId)) {
@@ -290,7 +293,7 @@ export class BusStore {
         room.owner !== agentId &&
         !room.members.includes(agentId)
       ) {
-        throw new BusError(`Not invited to room ${roomId}`, "NOT_INVITED");
+        throw new CommsError(`Not invited to room ${roomId}`, "NOT_INVITED");
       }
       room.invited = room.invited.filter((id) => id !== agentId);
       if (!room.members.includes(agentId)) {
@@ -317,7 +320,8 @@ export class BusStore {
 
   async leaveRoom(roomId: string, agentId: string): Promise<void> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
 
     room.members = room.members.filter((id) => id !== agentId);
     await this.writeJsonFile(this.roomPath(roomId), room);
@@ -347,9 +351,10 @@ export class BusStore {
     inviterId: string,
   ): Promise<void> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
     if (room.owner !== inviterId)
-      throw new BusError("Only the room owner can invite", "NOT_OWNER");
+      throw new CommsError("Only the room owner can invite", "NOT_OWNER");
 
     if (!room.invited.includes(targetId) && !room.members.includes(targetId)) {
       room.invited.push(targetId);
@@ -369,9 +374,10 @@ export class BusStore {
     kickerId: string,
   ): Promise<void> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
     if (room.owner !== kickerId)
-      throw new BusError("Only the room owner can kick", "NOT_OWNER");
+      throw new CommsError("Only the room owner can kick", "NOT_OWNER");
 
     room.members = room.members.filter((id) => id !== targetId);
     room.invited = room.invited.filter((id) => id !== targetId);
@@ -380,9 +386,10 @@ export class BusStore {
 
   async destroyRoom(roomId: string, agentId: string): Promise<void> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
     if (room.owner !== agentId)
-      throw new BusError("Only the room owner can destroy", "NOT_OWNER");
+      throw new CommsError("Only the room owner can destroy", "NOT_OWNER");
 
     for (const memberId of room.members) {
       const member = await this.getAgent(memberId);
@@ -411,9 +418,10 @@ export class BusStore {
     replyTo?: string,
   ): Promise<RoomMessage> {
     const room = await this.getRoom(roomId);
-    if (!room) throw new BusError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
     if (!room.members.includes(from))
-      throw new BusError(`Not a member of ${roomId}`, "NOT_MEMBER");
+      throw new CommsError(`Not a member of ${roomId}`, "NOT_MEMBER");
 
     const id = `${String(Date.now())}-${nanoid(6)}`;
     const message: RoomMessage = {
@@ -472,9 +480,9 @@ export class BusStore {
     if (to !== from) {
       const recipient = await this.getAgent(to);
       if (!recipient)
-        throw new BusError(`Agent ${to} not found`, "AGENT_NOT_FOUND");
+        throw new CommsError(`Agent ${to} not found`, "AGENT_NOT_FOUND");
       if (recipient.visibility === "ghost")
-        throw new BusError(`Cannot DM agent ${to}`, "AGENT_NOT_FOUND");
+        throw new CommsError(`Cannot DM agent ${to}`, "AGENT_NOT_FOUND");
     }
 
     const id = `${String(Date.now())}-${nanoid(6)}`;

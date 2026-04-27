@@ -13,13 +13,13 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 import {
-  BusStore,
+  FileStore,
   ensureRegistered,
   drainAndFormat,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
-const store = new BusStore(path.join(os.homedir(), ".agents", "bus"));
+const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
 
 // Minimal interface for the OpenCode SDK client we actually use
 interface OpenCodeClient {

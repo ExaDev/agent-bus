@@ -13,8 +13,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 import {
-  BusStore,
-  BusTool,
+  FileStore,
+  CommsTool,
   buildAction,
   ensureRegistered,
   MCP_TOOL_PARAMS,
@@ -26,8 +26,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function run(): Promise<void> {
-  const store = new BusStore(path.join(os.homedir(), ".agents", "bus"));
-  const tool = new BusTool(store);
+  const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
+  const tool = new CommsTool(store);
   let agentId: string | undefined;
 
   const mcp = new McpServer(

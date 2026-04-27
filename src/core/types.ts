@@ -152,10 +152,10 @@ export const DeliveryEventSchema = defineSchema(
 export type DeliveryEvent = z.infer<typeof DeliveryEventSchema>;
 
 // ---------------------------------------------------------------------------
-// BusAction
+// CommsAction
 // ---------------------------------------------------------------------------
 
-export const BusActionSchema = defineSchema(
+export const CommsActionSchema = defineSchema(
   z.discriminatedUnion("action", [
     z.object({
       action: z.literal("register"),
@@ -219,4 +219,4 @@ export const BusActionSchema = defineSchema(
     }),
   ]),
 );
-export type BusAction = z.infer<typeof BusActionSchema>;
+export type CommsAction = z.infer<typeof CommsActionSchema>;

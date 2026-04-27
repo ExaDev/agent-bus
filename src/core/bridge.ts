@@ -2,7 +2,7 @@
  * Agent Comms — shared bridge helpers.
  *
  * Every bridge needs the same three things:
- *   1. Parse tool parameters into a BusAction (via Zod schema)
+ *   1. Parse tool parameters into a CommsAction (via Zod schema)
  *   2. Format a DeliveryEvent as human-readable text
  *   3. Register (or recover) an agent identity
  *
@@ -10,8 +10,8 @@
  * push mechanism and tool registration.
  */
 
-import type { BusAction, DeliveryEvent, Visibility } from "./types.js";
-import { BusStore } from "./store.js";
+import type { CommsStore } from "./comms-store.js";
+import type { CommsAction, DeliveryEvent, Visibility } from "./types.js";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ export type ToolParams = z.infer<typeof MCP_TOOL_PARAMS>;
 // Removed MCP_TOOL_SCHEMA alias — use MCP_TOOL_PARAMS directly
 
 // ---------------------------------------------------------------------------
-// buildAction — parsed params → typed BusAction
+// buildAction — parsed params → typed CommsAction
 // ---------------------------------------------------------------------------
 
 class BuildActionError extends Error {
@@ -75,7 +75,7 @@ class BuildActionError extends Error {
   }
 }
 
-export function buildAction(params: Record<string, unknown>): BusAction {
+export function buildAction(params: Record<string, unknown>): CommsAction {
   const parsed = MCP_TOOL_PARAMS.safeParse(params);
   if (!parsed.success) return { action: "whoami" };
   const p = parsed.data;
@@ -90,7 +90,7 @@ export function buildAction(params: Record<string, unknown>): BusAction {
         tags: p.tags ?? [],
       };
     case "update": {
-      const update: BusAction & { action: "update" } = { action: "update" };
+      const update: CommsAction & { action: "update" } = { action: "update" };
       if (p.visibility !== undefined) update.visibility = p.visibility;
       if (p.status !== undefined) update.status = p.status;
       if (p.name !== undefined) update.name = p.name;
@@ -121,7 +121,7 @@ export function buildAction(params: Record<string, unknown>): BusAction {
       if (p.content === undefined)
         throw new BuildActionError("send", "content");
       if (p.target !== undefined) {
-        const send: BusAction & { action: "send" } = {
+        const send: CommsAction & { action: "send" } = {
           action: "send",
           target: p.target,
           content: p.content,
@@ -130,7 +130,7 @@ export function buildAction(params: Record<string, unknown>): BusAction {
         return send;
       }
       if (p.room !== undefined) {
-        const send: BusAction & { action: "send" } = {
+        const send: CommsAction & { action: "send" } = {
           action: "send",
           target: p.room,
           content: p.content,
@@ -199,7 +199,7 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
 
 export interface RegistrationResult {
   agentId: string;
-  store: BusStore;
+  store: CommsStore;
   isNew: boolean;
 }
 
@@ -208,7 +208,7 @@ export interface RegistrationResult {
  * Returns the agent ID and whether this was a fresh registration.
  */
 export async function ensureRegistered(opts: {
-  store: BusStore;
+  store: CommsStore;
   harness: string;
   cwd: string;
   defaultName: string;
@@ -242,7 +242,7 @@ export async function ensureRegistered(opts: {
 // ---------------------------------------------------------------------------
 
 export async function drainAndFormat(
-  store: BusStore,
+  store: CommsStore,
   agentId: string,
 ): Promise<string[]> {
   const events = await store.drainDelivery(agentId);

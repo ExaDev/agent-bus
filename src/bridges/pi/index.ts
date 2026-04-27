@@ -15,19 +15,19 @@ import { Type } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 
 import {
-  BusStore,
-  BusTool,
+  FileStore,
+  CommsTool,
   buildAction,
   ensureRegistered,
   drainAndFormat,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
-const BUS_ROOT = path.join(os.homedir(), ".agents", "bus");
+const COMMS_ROOT = path.join(os.homedir(), ".agents", "bus");
 
 export default function (pi: ExtensionAPI) {
-  const store = new BusStore(BUS_ROOT);
-  const tool = new BusTool(store);
+  const store = new FileStore(COMMS_ROOT);
+  const tool = new CommsTool(store);
 
   let agentId: string | undefined;
   let watcher: fs.FSWatcher | undefined;

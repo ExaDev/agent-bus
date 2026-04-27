@@ -16,8 +16,8 @@ import * as os from "node:os";
 import { DeliveryEventSchema } from "../../core/types.js";
 import type { DeliveryEvent } from "../../core/types.js";
 
-const BUS_ROOT = path.join(os.homedir(), ".agents", "bus");
-const IDENTITY_DIR = path.join(BUS_ROOT, "identity");
+const COMMS_ROOT = path.join(os.homedir(), ".agents", "bus");
+const IDENTITY_DIR = path.join(COMMS_ROOT, "identity");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -48,7 +48,7 @@ function readIdentity(): string | undefined {
 }
 
 function drainDelivery(agentId: string): DeliveryEvent[] {
-  const deliveryDir = path.join(BUS_ROOT, "delivery", agentId);
+  const deliveryDir = path.join(COMMS_ROOT, "delivery", agentId);
   try {
     const files = fs
       .readdirSync(deliveryDir)

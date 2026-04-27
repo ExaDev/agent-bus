@@ -1,8 +1,8 @@
 /**
- * Tool handler — processes BusAction objects and returns human-readable results.
+ * Tool handler — processes CommsAction objects and returns human-readable results.
  *
  * This is the shared logic that every bridge calls into. Bridges just:
- *   1. Parse the LLM's tool call into a BusAction
+ *   1. Parse the LLM's tool call into a CommsAction
  *   2. Call handleAction(action)
  *   3. Return the result string to the LLM
  */
@@ -10,29 +10,30 @@
 import type {
   AgentId,
   AgentIdentity,
-  BusAction,
+  CommsAction,
   Room,
   RoomMessage,
 } from "./types.js";
-import { BusStore, BusError } from "./store.js";
+import type { CommsStore } from "./comms-store.js";
+import { CommsError } from "./store.js";
 
-export interface ToolContext {
+export interface CommsContext {
   agentId: AgentId;
   harness: AgentIdentity["harness"];
   cwd: string;
   pid: number;
 }
 
-export interface ToolResult {
+export interface CommsResult {
   content: string;
   /** If true, the result is an error. */
   isError: boolean;
 }
 
-export class BusTool {
-  constructor(private readonly store: BusStore) {}
+export class CommsTool {
+  constructor(private readonly store: CommsStore) {}
 
-  async handle(ctx: ToolContext, action: BusAction): Promise<ToolResult> {
+  async handle(ctx: CommsContext, action: CommsAction): Promise<CommsResult> {
     try {
       switch (action.action) {
         case "register":
@@ -70,7 +71,7 @@ export class BusTool {
           };
       }
     } catch (err) {
-      if (err instanceof BusError) {
+      if (err instanceof CommsError) {
         return {
           content: `Error: ${err.message} (${err.code})`,
           isError: true,
@@ -84,9 +85,9 @@ export class BusTool {
   }
 
   private async register(
-    ctx: ToolContext,
-    action: BusAction & { action: "register" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "register" },
+  ): Promise<CommsResult> {
     const agent = await this.store.registerAgent({
       name: action.name,
       harness: ctx.harness,
@@ -102,9 +103,9 @@ export class BusTool {
   }
 
   private async update(
-    ctx: ToolContext,
-    action: BusAction & { action: "update" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "update" },
+  ): Promise<CommsResult> {
     const patch: Partial<
       Pick<AgentIdentity, "name" | "visibility" | "status" | "tags" | "pid">
     > = {};
@@ -119,7 +120,7 @@ export class BusTool {
     };
   }
 
-  private async whoami(ctx: ToolContext): Promise<ToolResult> {
+  private async whoami(ctx: CommsContext): Promise<CommsResult> {
     const agent = await this.store.getAgent(ctx.agentId);
     if (!agent) return { content: "Not registered.", isError: true };
     return {
@@ -137,9 +138,9 @@ export class BusTool {
   }
 
   private async createRoom(
-    ctx: ToolContext,
-    action: BusAction & { action: "create_room" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "create_room" },
+  ): Promise<CommsResult> {
     const room = await this.store.createRoom({
       name: action.name,
       type: action.type,
@@ -154,7 +155,7 @@ export class BusTool {
     };
   }
 
-  private async listRooms(ctx: ToolContext): Promise<ToolResult> {
+  private async listRooms(ctx: CommsContext): Promise<CommsResult> {
     const rooms = await this.store.listRooms(ctx.agentId);
     if (rooms.length === 0)
       return { content: "No rooms found.", isError: false };
@@ -170,9 +171,9 @@ export class BusTool {
   }
 
   private async joinRoom(
-    ctx: ToolContext,
-    action: BusAction & { action: "join_room" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "join_room" },
+  ): Promise<CommsResult> {
     const roomId = action.room;
     const room = await this.store.joinRoom(roomId, ctx.agentId);
     return {
@@ -182,17 +183,17 @@ export class BusTool {
   }
 
   private async leaveRoom(
-    ctx: ToolContext,
-    action: BusAction & { action: "leave_room" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "leave_room" },
+  ): Promise<CommsResult> {
     await this.store.leaveRoom(action.room, ctx.agentId);
     return { content: `Left room "${action.room}".`, isError: false };
   }
 
   private async send(
-    ctx: ToolContext,
-    action: BusAction & { action: "send" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "send" },
+  ): Promise<CommsResult> {
     const roomId = action.target;
     const msg = await this.store.sendRoomMessage(
       roomId,
@@ -207,9 +208,9 @@ export class BusTool {
   }
 
   private async dm(
-    ctx: ToolContext,
-    action: BusAction & { action: "dm" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "dm" },
+  ): Promise<CommsResult> {
     const targetId = action.target;
     const msg = await this.store.sendDm(ctx.agentId, targetId, action.content);
     return {
@@ -218,7 +219,7 @@ export class BusTool {
     };
   }
 
-  private async listAgents(ctx: ToolContext): Promise<ToolResult> {
+  private async listAgents(ctx: CommsContext): Promise<CommsResult> {
     const agents = await this.store.listAgents(ctx.agentId);
     if (agents.length === 0)
       return { content: "No other agents online.", isError: false };
@@ -234,9 +235,9 @@ export class BusTool {
   }
 
   private async readRoom(
-    ctx: ToolContext,
-    action: BusAction & { action: "read_room" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "read_room" },
+  ): Promise<CommsResult> {
     const roomId = action.room;
     const messages = await this.store.readRoomMessages(roomId, action.since);
     if (messages.length === 0)
@@ -250,9 +251,9 @@ export class BusTool {
   }
 
   private async invite(
-    ctx: ToolContext,
-    action: BusAction & { action: "invite" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "invite" },
+  ): Promise<CommsResult> {
     await this.store.inviteToRoom(action.room, action.agent, ctx.agentId);
     return {
       content: `Invited ${action.agent} to ${action.room}.`,
@@ -261,9 +262,9 @@ export class BusTool {
   }
 
   private async kick(
-    ctx: ToolContext,
-    action: BusAction & { action: "kick" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "kick" },
+  ): Promise<CommsResult> {
     await this.store.kickFromRoom(action.room, action.agent, ctx.agentId);
     return {
       content: `Kicked ${action.agent} from ${action.room}.`,
@@ -272,9 +273,9 @@ export class BusTool {
   }
 
   private async destroyRoom(
-    ctx: ToolContext,
-    action: BusAction & { action: "destroy_room" },
-  ): Promise<ToolResult> {
+    ctx: CommsContext,
+    action: CommsAction & { action: "destroy_room" },
+  ): Promise<CommsResult> {
     await this.store.destroyRoom(action.room, ctx.agentId);
     return { content: `Destroyed room "${action.room}".`, isError: false };
   }
