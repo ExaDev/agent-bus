@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
 jobs:
   lint:
     name: Lint
@@ -46,23 +52,19 @@ jobs:
 
   release:
     name: Release
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [lint, typecheck, test]
-    if: github.event_name == 'push'
-    permissions:
-      contents: write
-      id-token: write
-      issues: write
-      pull-requests: write
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .tool-versions
-          registry-url: https://registry.npmjs.org
+          # Do NOT set registry-url — it creates an .npmrc that overrides OIDC
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm exec semantic-release
