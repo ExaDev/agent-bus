@@ -46,35 +46,6 @@ const McpServersSchema = z
   })
   .loose();
 
-const hookEntrySchema = z
-  .object({
-    type: z.string(),
-    command: z.string(),
-    timeout: z.number().optional(),
-  })
-  .loose();
-
-const hookGroupSchema = z
-  .array(
-    z
-      .object({
-        hooks: z.array(hookEntrySchema).optional(),
-      })
-      .loose(),
-  )
-  .optional();
-
-const HooksSchema = z
-  .object({
-    hooks: z
-      .object({
-        Stop: hookGroupSchema,
-        PostToolUse: hookGroupSchema,
-      })
-      .optional(),
-  })
-  .loose();
-
 const OpenCodeConfigSchema = z
   .object({
     plugin: z.array(z.string()).optional(),
@@ -453,57 +424,6 @@ function configureCodex(): void {
     fs.writeFileSync(tomlPath, content + "\n");
     console.log(`  → Created ${tomlPath}`);
   }
-
-  // Add hooks for delivery push
-  const hooksPath = path.join(configDir, "hooks.json");
-  const parsed = readJsonFile(hooksPath);
-  const hooks = HooksSchema.parse(parsed ?? {});
-
-  const stopHookEntry = {
-    type: "command",
-    command: `npx agent-comms bridge codex-stop`,
-    timeout: 10,
-  };
-  const postToolUseHookEntry = {
-    type: "command",
-    command: `npx agent-comms bridge codex-post-tool-use`,
-    timeout: 10,
-  };
-
-  // Stop hook
-  const stopHooks = hooks.hooks?.Stop ?? [{ hooks: [] }];
-  const firstStop = stopHooks[0];
-  if (firstStop === undefined) return;
-  const stopInner = firstStop.hooks ?? [];
-
-  const alreadyHasStopHook = stopInner.some((h) =>
-    h.command.includes("agent-comms"),
-  );
-  if (!alreadyHasStopHook) {
-    stopInner.push(stopHookEntry);
-    firstStop.hooks = stopInner;
-  }
-
-  // PostToolUse hook (fires after every tool call for mid-turn delivery)
-  const postToolUseHooks = hooks.hooks?.PostToolUse ?? [{ hooks: [] }];
-  const firstPostToolUse = postToolUseHooks[0];
-  if (firstPostToolUse === undefined) return;
-  const postToolUseInner = firstPostToolUse.hooks ?? [];
-
-  const alreadyHasPostToolUseHook = postToolUseInner.some((h) =>
-    h.command.includes("agent-comms"),
-  );
-  if (!alreadyHasPostToolUseHook) {
-    postToolUseInner.push(postToolUseHookEntry);
-    firstPostToolUse.hooks = postToolUseInner;
-  }
-
-  if (!alreadyHasStopHook || !alreadyHasPostToolUseHook) {
-    hooks.hooks = { Stop: stopHooks, PostToolUse: postToolUseHooks };
-    writeJsonFile(hooksPath, hooks);
-  } else {
-    console.log(`  → Hooks already in ${hooksPath}`);
-  }
 }
 
 function removeCodex(): void {
@@ -522,63 +442,19 @@ function removeCodex(): void {
     fs.writeFileSync(tomlPath, lines.join("\n").trimEnd() + "\n");
     console.log(`  Removed agent-comms from ${tomlPath}`);
   }
-
-  // Remove from hooks.json
-  const hooksPath = path.join(configDir, "hooks.json");
-  const parsed = readJsonFile(hooksPath);
-  if (parsed === undefined) return;
-  const hooks = HooksSchema.safeParse(parsed);
-  if (!hooks.success) return;
-
-  const hookSections: ("Stop" | "PostToolUse")[] = ["Stop", "PostToolUse"];
-  let removed = false;
-  for (const section of hookSections) {
-    const sectionHooks = hooks.data.hooks?.[section];
-    if (sectionHooks?.[0]?.hooks) {
-      const before = sectionHooks[0].hooks.length;
-      sectionHooks[0].hooks = sectionHooks[0].hooks.filter(
-        (h) =>
-          !h.command.includes("agent-comms") &&
-          !h.command.includes("agent-bus"),
-      );
-      if (sectionHooks[0].hooks.length < before) removed = true;
-    }
-  }
-  if (removed) {
-    writeJsonFile(hooksPath, hooks.data);
-    console.log(`  Removed agent-comms hooks from ${hooksPath}`);
-  }
 }
 
 function checkCodex(): CheckResult {
   const details: string[] = [];
-  let tomlOk = false;
-  let hookOk = false;
-
   const tomlPath = path.join(HOME, ".codex", "config.toml");
   if (fs.existsSync(tomlPath)) {
     const content = fs.readFileSync(tomlPath, "utf-8");
-    tomlOk = content.includes("agent-comms");
+    const tomlOk = content.includes("agent-comms");
     details.push(tomlOk ? `MCP server in ${tomlPath}` : `Not in ${tomlPath}`);
-  } else {
-    details.push(`${tomlPath} not found`);
+    return { configured: tomlOk, details };
   }
-
-  const hooksPath = path.join(HOME, ".codex", "hooks.json");
-  const parsed = readJsonFile(hooksPath);
-  const hooks = HooksSchema.safeParse(parsed ?? {});
-  if (hooks.success && hooks.data.hooks?.Stop?.[0]?.hooks) {
-    hookOk = hooks.data.hooks.Stop[0].hooks.some((h) =>
-      h.command.includes("agent-comms"),
-    );
-    details.push(
-      hookOk ? `Stop hook in ${hooksPath}` : `No hook in ${hooksPath}`,
-    );
-  } else {
-    details.push(`${hooksPath} not configured`);
-  }
-
-  return { configured: tomlOk && hookOk, details };
+  details.push(`${tomlPath} not found`);
+  return { configured: false, details };
 }
 
 // ---------------------------------------------------------------------------
