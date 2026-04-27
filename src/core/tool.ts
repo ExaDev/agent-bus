@@ -19,6 +19,7 @@ import { BusStore, BusError } from "./store.js";
 export interface ToolContext {
   agentId: AgentId;
   harness: AgentIdentity["harness"];
+  cwd: string;
   pid: number;
 }
 
@@ -89,6 +90,7 @@ export class BusTool {
     const agent = await this.store.registerAgent({
       name: action.name,
       harness: ctx.harness,
+      cwd: ctx.cwd,
       pid: ctx.pid,
       visibility: action.visibility,
       tags: action.tags,

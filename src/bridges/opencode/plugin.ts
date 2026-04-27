@@ -56,6 +56,7 @@ export const AgentCommsPlugin = async (opts: {
   const client = opts.client;
 
   const reg = await ensureRegistered({
+    cwd: process.cwd(),
     store,
     harness: "opencode",
     defaultName: `opencode-${nanoid(4)}`,

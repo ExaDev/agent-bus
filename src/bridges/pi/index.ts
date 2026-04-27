@@ -39,6 +39,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     const reg = await ensureRegistered({
       store,
+      cwd: process.cwd(),
       harness: "pi",
       defaultName: `pi-${nanoid(4)}`,
     });
@@ -174,7 +175,7 @@ export default function (pi: ExtensionAPI) {
 
       const action = buildAction(params);
       const result = await tool.handle(
-        { agentId, harness: "pi", pid: process.pid },
+        { agentId, harness: "pi", cwd: process.cwd(), pid: process.pid },
         action,
       );
 

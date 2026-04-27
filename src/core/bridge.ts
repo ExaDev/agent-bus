@@ -210,13 +210,14 @@ export interface RegistrationResult {
 export async function ensureRegistered(opts: {
   store: BusStore;
   harness: string;
+  cwd: string;
   defaultName: string;
   visibility?: Visibility;
   tags?: string[];
 }): Promise<RegistrationResult> {
   await opts.store.init();
 
-  const identity = await opts.store.readIdentity(opts.harness);
+  const identity = await opts.store.readIdentity(opts.harness, opts.cwd);
   if (identity) {
     await opts.store.updateAgent(identity.id, {
       status: "active",
@@ -228,6 +229,7 @@ export async function ensureRegistered(opts: {
   const agent = await opts.store.registerAgent({
     name: opts.defaultName,
     harness: opts.harness,
+    cwd: opts.cwd,
     pid: process.pid,
     visibility: opts.visibility ?? "visible",
     tags: opts.tags ?? [],

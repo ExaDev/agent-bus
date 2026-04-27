@@ -82,8 +82,9 @@ export class BusStore {
     return path.join(this.root, "delivery", id);
   }
 
-  identityPath(harness: string): string {
-    return path.join(this.root, "identity", `${harness}.json`);
+  identityPath(harness: string, cwd: string): string {
+    const slug = cwd.replace(/[^a-zA-Z0-9]/g, "_");
+    return path.join(this.root, "identity", `${harness}--${slug}.json`);
   }
 
   // -------------------------------------------------------------------------
@@ -104,9 +105,12 @@ export class BusStore {
   // Identity
   // -------------------------------------------------------------------------
 
-  async readIdentity(harness: string): Promise<{ id: string } | undefined> {
+  async readIdentity(
+    harness: string,
+    cwd: string,
+  ): Promise<{ id: string } | undefined> {
     try {
-      const raw = await this.readJsonFile(this.identityPath(harness));
+      const raw = await this.readJsonFile(this.identityPath(harness, cwd));
       if (typeof raw === "object" && raw !== null && "id" in raw) {
         const id = raw.id;
         if (typeof id === "string") return { id };
@@ -117,8 +121,8 @@ export class BusStore {
     }
   }
 
-  async writeIdentity(harness: string, id: string): Promise<void> {
-    await this.writeJsonFile(this.identityPath(harness), { id });
+  async writeIdentity(harness: string, cwd: string, id: string): Promise<void> {
+    await this.writeJsonFile(this.identityPath(harness, cwd), { id });
   }
 
   // -------------------------------------------------------------------------
@@ -128,11 +132,12 @@ export class BusStore {
   async registerAgent(opts: {
     name: string;
     harness: string;
+    cwd: string;
     pid: number;
     visibility: Visibility;
     tags: string[];
   }): Promise<AgentIdentity> {
-    const existing = await this.readIdentity(opts.harness);
+    const existing = await this.readIdentity(opts.harness, opts.cwd);
     if (existing) {
       return this.updateAgent(existing.id, {
         name: opts.name,
@@ -157,7 +162,7 @@ export class BusStore {
     };
 
     await this.writeJsonFile(this.agentPath(id), agent);
-    await this.writeIdentity(opts.harness, id);
+    await this.writeIdentity(opts.harness, opts.cwd, id);
     return agent;
   }
 

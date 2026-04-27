@@ -84,6 +84,7 @@ export async function run(): Promise<void> {
       const actionParam = params.action;
       if (!agentId && actionParam !== "register") {
         const reg = await ensureRegistered({
+          cwd: process.cwd(),
           store,
           harness: "claude-code",
           defaultName: `claude-code-${nanoid(4)}`,
@@ -101,7 +102,12 @@ export async function run(): Promise<void> {
 
       const action = buildAction(params);
       const result = await tool.handle(
-        { agentId, harness: "claude-code", pid: process.pid },
+        {
+          agentId,
+          harness: "claude-code",
+          cwd: process.cwd(),
+          pid: process.pid,
+        },
         action,
       );
 
@@ -119,6 +125,7 @@ export async function run(): Promise<void> {
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({
+    cwd: process.cwd(),
     store,
     harness: "claude-code",
     defaultName: `claude-code-${nanoid(4)}`,

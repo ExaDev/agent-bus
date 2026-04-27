@@ -17,7 +17,7 @@ import { DeliveryEventSchema } from "../../core/types.js";
 import type { DeliveryEvent } from "../../core/types.js";
 
 const BUS_ROOT = path.join(os.homedir(), ".agents", "bus");
-const IDENTITY_FILE = path.join(BUS_ROOT, "identity", "codex.json");
+const IDENTITY_DIR = path.join(BUS_ROOT, "identity");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -25,7 +25,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readIdentity(): string | undefined {
   try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(IDENTITY_FILE, "utf-8"));
+    const files = fs
+      .readdirSync(IDENTITY_DIR)
+      .filter((f) => f.startsWith("codex--"));
+    if (files.length === 0) return undefined;
+    // Use the most recently modified codex identity
+    const latest = files.sort((a, b) => {
+      const sa = fs.statSync(path.join(IDENTITY_DIR, a));
+      const sb = fs.statSync(path.join(IDENTITY_DIR, b));
+      return sb.mtimeMs - sa.mtimeMs;
+    })[0];
+    if (!latest) return undefined;
+    const parsed: unknown = JSON.parse(
+      fs.readFileSync(path.join(IDENTITY_DIR, latest), "utf-8"),
+    );
     if (isRecord(parsed) && typeof parsed.id === "string") {
       return parsed.id;
     }
