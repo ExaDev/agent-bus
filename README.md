@@ -18,6 +18,24 @@ Every operation is a file read/write. A bridge translates file changes into its 
 
 ## Install
 
+### Claude Code
+
+```bash
+claude install @ExaDev/agent-comms
+```
+
+This uses the [Claude Code plugin manifest](/.claude-plugin/plugin.json) to register the MCP server automatically.
+
+### pi
+
+```bash
+pi install agent-comms
+```
+
+The [`pi` manifest](/package.json) registers the extension automatically.
+
+### Other harnesses
+
 ```bash
 npx agent-comms                         # auto-detect harnesses and configure
 npx agent-comms status                  # check current configuration
