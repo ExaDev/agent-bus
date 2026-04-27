@@ -59,14 +59,17 @@ export type ToolParams = z.infer<typeof MCP_TOOL_PARAMS>;
  * Zod schema for the MCP tool inputSchema field.
  * This is the same schema exposed directly for the MCP SDK.
  */
-export const MCP_TOOL_SCHEMA = MCP_TOOL_PARAMS;
+// Removed MCP_TOOL_SCHEMA alias — use MCP_TOOL_PARAMS directly
 
 // ---------------------------------------------------------------------------
 // buildAction — parsed params → typed BusAction
 // ---------------------------------------------------------------------------
 
 class BuildActionError extends Error {
-  constructor(public readonly action: string, field: string) {
+  constructor(
+    public readonly action: string,
+    field: string,
+  ) {
     super(`Missing required field "${field}" for action "${action}"`);
     this.name = "BuildActionError";
   }
@@ -97,7 +100,8 @@ export function buildAction(params: Record<string, unknown>): BusAction {
     case "whoami":
       return { action: "whoami" };
     case "create_room":
-      if (p.room === undefined) throw new BuildActionError("create_room", "room");
+      if (p.room === undefined)
+        throw new BuildActionError("create_room", "room");
       return {
         action: "create_room",
         name: p.room,
@@ -110,17 +114,27 @@ export function buildAction(params: Record<string, unknown>): BusAction {
       if (p.room === undefined) throw new BuildActionError("join_room", "room");
       return { action: "join_room", room: p.room };
     case "leave_room":
-      if (p.room === undefined) throw new BuildActionError("leave_room", "room");
+      if (p.room === undefined)
+        throw new BuildActionError("leave_room", "room");
       return { action: "leave_room", room: p.room };
     case "send": {
-      if (p.content === undefined) throw new BuildActionError("send", "content");
+      if (p.content === undefined)
+        throw new BuildActionError("send", "content");
       if (p.target !== undefined) {
-        const send: BusAction & { action: "send" } = { action: "send", target: p.target, content: p.content };
+        const send: BusAction & { action: "send" } = {
+          action: "send",
+          target: p.target,
+          content: p.content,
+        };
         if (p.replyTo !== undefined) send.replyTo = p.replyTo;
         return send;
       }
       if (p.room !== undefined) {
-        const send: BusAction & { action: "send" } = { action: "send", target: p.room, content: p.content };
+        const send: BusAction & { action: "send" } = {
+          action: "send",
+          target: p.room,
+          content: p.content,
+        };
         if (p.replyTo !== undefined) send.replyTo = p.replyTo;
         return send;
       }
@@ -154,7 +168,8 @@ export function buildAction(params: Record<string, unknown>): BusAction {
       if (p.agent === undefined) throw new BuildActionError("kick", "agent");
       return { action: "kick", room: p.room, agent: p.agent };
     case "destroy_room":
-      if (p.room === undefined) throw new BuildActionError("destroy_room", "room");
+      if (p.room === undefined)
+        throw new BuildActionError("destroy_room", "room");
       return { action: "destroy_room", room: p.room };
   }
 }

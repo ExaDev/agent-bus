@@ -13,7 +13,7 @@ export {
   formatDeliveryEvent,
   ensureRegistered,
   drainAndFormat,
-  MCP_TOOL_SCHEMA,
+  MCP_TOOL_PARAMS,
 } from "./bridge.js";
 export type { RegistrationResult } from "./bridge.js";
 export * from "./types.js";

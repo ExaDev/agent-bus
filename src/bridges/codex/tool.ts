@@ -25,7 +25,7 @@ import {
   BusTool,
   buildAction,
   ensureRegistered,
-  MCP_TOOL_SCHEMA,
+  MCP_TOOL_PARAMS,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
@@ -51,7 +51,7 @@ mcp.registerTool(
       "send, dm, list_agents, read_room, invite, kick, destroy_room.",
       "Incoming messages are delivered automatically via the Stop hook.",
     ].join(" "),
-    inputSchema: MCP_TOOL_SCHEMA,
+    inputSchema: MCP_TOOL_PARAMS,
   },
   async (rawParams: unknown) => {
     const params = isRecord(rawParams) ? rawParams : {};

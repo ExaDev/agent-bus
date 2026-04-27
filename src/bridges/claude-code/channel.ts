@@ -29,7 +29,7 @@ import {
   buildAction,
   ensureRegistered,
   drainAndFormat,
-  MCP_TOOL_SCHEMA,
+  MCP_TOOL_PARAMS,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
@@ -63,7 +63,7 @@ mcp.registerTool(
       "send, dm, list_agents, read_room, invite, kick, destroy_room.",
       'Incoming messages appear as <channel source="agent-comms"> events.',
     ].join(" "),
-    inputSchema: MCP_TOOL_SCHEMA,
+    inputSchema: MCP_TOOL_PARAMS,
   },
   async (rawParams: unknown) => {
     const params = isRecord(rawParams) ? rawParams : {};
