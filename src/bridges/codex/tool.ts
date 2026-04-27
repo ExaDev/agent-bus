@@ -2,21 +2,21 @@
  * Agent Comms — Codex MCP tool server.
  *
  * Provides the "agent_comms" tool for Codex to call.
- * Push delivery is handled by the Stop hook (stop_hook.ts).
+ * Uses TCP mesh for state sync. Pending messages are drained and
+ * appended to every tool response so Codex sees them mid-turn.
  *
  * Run via: npx agent-comms bridge codex
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import * as path from "node:path";
-import * as os from "node:os";
 
 import {
-  FileStore,
+  MeshStore,
   CommsTool,
   buildAction,
   ensureRegistered,
+  drainAndFormat,
   MCP_TOOL_PARAMS,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
@@ -26,7 +26,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function run(): Promise<void> {
-  const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
+  const store = new MeshStore();
   const tool = new CommsTool(store);
   let agentId: string | undefined;
 
@@ -46,7 +46,7 @@ export async function run(): Promise<void> {
         "Cross-harness agent communication bus. Actions:",
         "register, update, whoami, create_room, list_rooms, join_room, leave_room,",
         "send, dm, list_agents, read_room, invite, kick, destroy_room.",
-        "Incoming messages are delivered automatically via the Stop hook.",
+        "Pending incoming messages are included in every response.",
       ].join(" "),
       inputSchema: MCP_TOOL_PARAMS,
     },
@@ -73,10 +73,20 @@ export async function run(): Promise<void> {
         action,
       );
 
-      return {
-        content: [{ type: "text", text: result.content }],
-        isError: result.isError,
-      };
+      // Drain pending delivery messages and append to response
+      const deliveryLines = await drainAndFormat(store, agentId);
+      const content: { type: "text"; text: string }[] = [
+        { type: "text", text: result.content },
+      ];
+
+      if (deliveryLines.length > 0) {
+        content.push({
+          type: "text",
+          text: "📬 Incoming messages:\n" + deliveryLines.join("\n"),
+        });
+      }
+
+      return { content, isError: result.isError };
     },
   );
 
@@ -84,6 +94,7 @@ export async function run(): Promise<void> {
   // Startup
   // -----------------------------------------------------------------------
 
+  await store.init();
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({

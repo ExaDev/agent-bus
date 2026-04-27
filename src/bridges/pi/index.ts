@@ -1,42 +1,44 @@
 /**
  * Agent Comms — pi bridge extension.
  *
- * Provides the `agent_comms` tool and watches the delivery queue,
- * pushing incoming messages via sendUserMessage().
+ * Provides the `agent_comms` tool and receives incoming messages
+ * via TCP mesh push, forwarding them to the LLM via sendUserMessage().
  *
  * Install: add bridge path to ~/.pi/agent/settings.json extensions array
  */
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 
 import {
-  FileStore,
+  MeshStore,
   CommsTool,
   buildAction,
   ensureRegistered,
-  drainAndFormat,
+  formatDeliveryEvent,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
-const COMMS_ROOT = path.join(os.homedir(), ".agents", "bus");
-
 export default function (pi: ExtensionAPI) {
-  const store = new FileStore(COMMS_ROOT);
+  const store = new MeshStore();
   const tool = new CommsTool(store);
 
   let agentId: string | undefined;
-  let watcher: fs.FSWatcher | undefined;
+
+  // Incoming messages arrive via TCP mesh — push immediately
+  store.onDelivery = (_targetId: string, event) => {
+    const line = formatDeliveryEvent(event);
+    pi.sendUserMessage(`📬 ${line}`, { deliverAs: "steer" });
+  };
 
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
 
   pi.on("session_start", async (_event, ctx) => {
+    await store.init();
+
     const reg = await ensureRegistered({
       store,
       cwd: process.cwd(),
@@ -47,41 +49,15 @@ export default function (pi: ExtensionAPI) {
 
     if (!reg.isNew) {
       ctx.ui.notify(`Agent Comms: resumed as ${reg.agentId}`, "info");
-      await drainAndPush();
     }
-
-    startWatching();
   });
 
   pi.on("session_shutdown", async () => {
-    watcher?.close();
     if (agentId) {
       await store.setAgentOffline(agentId);
     }
+    await store.shutdown();
   });
-
-  // -----------------------------------------------------------------------
-  // Delivery watcher
-  // -----------------------------------------------------------------------
-
-  function startWatching() {
-    if (!agentId) return;
-    const deliveryDir = store.deliveryDir(agentId);
-    fs.mkdirSync(deliveryDir, { recursive: true });
-
-    watcher = fs.watch(deliveryDir, (event, filename) => {
-      if (event !== "rename" || !filename?.endsWith(".json")) return;
-      void drainAndPush();
-    });
-  }
-
-  async function drainAndPush() {
-    if (!agentId) return;
-    const lines = await drainAndFormat(store, agentId);
-    for (const line of lines) {
-      pi.sendUserMessage(`📬 ${line}`, { deliverAs: "steer" });
-    }
-  }
 
   // -----------------------------------------------------------------------
   // Tool registration

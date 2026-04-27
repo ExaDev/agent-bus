@@ -3,6 +3,7 @@
  *
  * MCP channel server that provides the "agent_comms" tool and pushes
  * incoming messages into Claude's context via <channel> events.
+ * Uses TCP mesh for real-time delivery — no filesystem polling.
  *
  * Run via: npx agent-comms bridge claude-code
  * Requires: claude --dangerously-load-development-channels
@@ -10,15 +11,13 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import * as path from "node:path";
-import * as os from "node:os";
 
 import {
-  FileStore,
+  MeshStore,
   CommsTool,
   buildAction,
   ensureRegistered,
-  drainAndFormat,
+  formatDeliveryEvent,
   MCP_TOOL_PARAMS,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
@@ -28,10 +27,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function run(): Promise<void> {
-  const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
+  const store = new MeshStore();
   const tool = new CommsTool(store);
   let agentId: string | undefined;
-  let watchTimer: ReturnType<typeof setInterval> | undefined;
 
   const mcp = new McpServer(
     { name: "agent-comms", version: "0.2.0" },
@@ -42,27 +40,14 @@ export async function run(): Promise<void> {
     },
   );
 
-  // -----------------------------------------------------------------------
-  // Delivery polling (channels can't use fs.watch easily)
-  // -----------------------------------------------------------------------
-
-  function startDeliveryPoll() {
-    if (watchTimer) return;
-    watchTimer = setInterval(() => {
-      void pollDelivery();
-    }, 2000);
-  }
-
-  async function pollDelivery() {
-    if (!agentId) return;
-    const lines = await drainAndFormat(store, agentId);
-    for (const line of lines) {
-      await mcp.server.notification({
-        method: "notifications/claude/channel",
-        params: { content: line, meta: {} },
-      });
-    }
-  }
+  // Incoming messages arrive via TCP mesh — push as channel notifications
+  store.onDelivery = async (_targetId: string, event) => {
+    const line = formatDeliveryEvent(event);
+    await mcp.server.notification({
+      method: "notifications/claude/channel",
+      params: { content: line, meta: {} },
+    });
+  };
 
   // -----------------------------------------------------------------------
   // Tool registration
@@ -94,7 +79,6 @@ export async function run(): Promise<void> {
           defaultName: name,
         });
         agentId = reg.agentId;
-        startDeliveryPoll();
       }
 
       const action = buildAction(params);
@@ -119,6 +103,7 @@ export async function run(): Promise<void> {
   // Startup
   // -----------------------------------------------------------------------
 
+  await store.init();
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({
@@ -128,5 +113,4 @@ export async function run(): Promise<void> {
     defaultName: `claude-code-${nanoid(4)}`,
   });
   agentId = reg.agentId;
-  startDeliveryPoll();
 }

@@ -146,7 +146,9 @@ export class MeshStore implements CommsStore {
   >();
   private peerInfo = new Map<string, PeerInfo>();
 
-  onDelivery: ((agentId: string, event: DeliveryEvent) => void) | undefined;
+  onDelivery:
+    | ((agentId: string, event: DeliveryEvent) => void | Promise<void>)
+    | undefined;
 
   constructor() {
     this.peerId = nanoid(8);
@@ -388,7 +390,7 @@ export class MeshStore implements CommsStore {
         arr.push(patch.event);
         this.deliveryQueues.set(patch.agentId, arr);
         if (patch.agentId === this.peerId && this.onDelivery) {
-          this.onDelivery(patch.agentId, patch.event);
+          void this.onDelivery(patch.agentId, patch.event);
         }
         break;
       }
@@ -473,7 +475,7 @@ export class MeshStore implements CommsStore {
     arr.push(event);
     this.deliveryQueues.set(agentId, arr);
     if (agentId === this.peerId && this.onDelivery) {
-      this.onDelivery(agentId, event);
+      void this.onDelivery(agentId, event);
     }
 
     // Remote delivery

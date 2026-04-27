@@ -1,25 +1,21 @@
 /**
  * Agent Comms — OpenCode plugin bridge.
  *
- * Drains delivery queue on session.idle and injects messages via
- * tui.prompt.append + tui.submitPrompt.
+ * Receives incoming messages via TCP mesh push and injects them
+ * into the OpenCode TUI via tui.prompt.append + tui.submitPrompt.
  *
  * Install (project):  ln -s ~/Developer/agent-comms/src/bridges/opencode/plugin.ts .opencode/plugins/agent-comms.ts
  * Install (global):   ln -s ~/Developer/agent-comms/src/bridges/opencode/plugin.ts ~/.config/opencode/plugins/agent-comms.ts
  */
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
-
 import {
-  FileStore,
+  MeshStore,
   ensureRegistered,
-  drainAndFormat,
+  formatDeliveryEvent,
 } from "../../core/index.js";
 import { nanoid } from "../../core/nanoid.js";
 
-const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
+const store = new MeshStore();
 
 // Minimal interface for the OpenCode SDK client we actually use
 interface OpenCodeClient {
@@ -55,6 +51,8 @@ export const AgentCommsPlugin = async (opts: {
   }
   const client = opts.client;
 
+  await store.init();
+
   const reg = await ensureRegistered({
     cwd: process.cwd(),
     store,
@@ -63,19 +61,10 @@ export const AgentCommsPlugin = async (opts: {
   });
   const agentId = reg.agentId;
 
-  // Watch delivery dir and push immediately when messages arrive
-  const deliveryDir = store.deliveryDir(agentId);
-  fs.mkdirSync(deliveryDir, { recursive: true });
-  fs.watch(deliveryDir, (event, filename) => {
-    if (event !== "rename" || !filename?.endsWith(".json")) return;
-    void drainAndInject();
-  });
-
-  async function drainAndInject() {
-    const lines = await drainAndFormat(store, agentId);
-    if (lines.length === 0) return;
-
-    const message = "📬 Agent Comms:\n" + lines.map((l) => `- ${l}`).join("\n");
+  // Incoming messages arrive via TCP mesh — push to TUI immediately
+  store.onDelivery = async (_targetId: string, event) => {
+    const line = formatDeliveryEvent(event);
+    const message = `📬 Agent Comms: ${line}`;
     try {
       await client.tui.appendPrompt({ text: message });
       await client.tui.submitPrompt();
@@ -92,12 +81,22 @@ export const AgentCommsPlugin = async (opts: {
         });
       }
     }
-  }
+  };
 
   return {
     event: async ({ event }: { event: { type: string } }) => {
       if (event.type === "session.idle") {
-        await drainAndInject();
+        // Drain any remaining undelivered messages on idle
+        const events = await store.drainDelivery(agentId);
+        for (const e of events) {
+          const line = formatDeliveryEvent(e);
+          try {
+            await client.tui.appendPrompt({ text: `📬 ${line}` });
+            await client.tui.submitPrompt();
+          } catch {
+            /* best effort */
+          }
+        }
       }
     },
   };

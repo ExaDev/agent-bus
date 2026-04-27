@@ -2,19 +2,17 @@
  * Agent Comms — generic MCP tool server.
  *
  * Standard MCP server that works with any MCP-compatible harness.
- * Incoming messages are drained and appended to every tool response
- * so the agent sees them without needing a harness-specific push mechanism.
+ * Uses TCP mesh for state sync. Pending messages are drained and
+ * appended to every tool response so the agent sees them.
  *
  * Run via: npx agent-comms bridge mcp
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import * as path from "node:path";
-import * as os from "node:os";
 
 import {
-  FileStore,
+  MeshStore,
   CommsTool,
   buildAction,
   ensureRegistered,
@@ -28,7 +26,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function run(): Promise<void> {
-  const store = new FileStore(path.join(os.homedir(), ".agents", "bus"));
+  const store = new MeshStore();
   const tool = new CommsTool(store);
   let agentId: string | undefined;
 
@@ -97,6 +95,7 @@ export async function run(): Promise<void> {
   // Startup
   // -----------------------------------------------------------------------
 
+  await store.init();
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({
