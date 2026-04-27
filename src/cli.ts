@@ -31,15 +31,17 @@ const PiSettingsSchema = z
 
 const McpServersSchema = z
   .object({
-    mcpServers: z.record(
-      z.string(),
-      z
-        .object({
-          command: z.string(),
-          args: z.array(z.string()).optional(),
-        })
-        .loose(),
-    ),
+    mcpServers: z
+      .record(
+        z.string(),
+        z
+          .object({
+            command: z.string(),
+            args: z.array(z.string()).optional(),
+          })
+          .loose(),
+      )
+      .default({}),
   })
   .loose();
 
