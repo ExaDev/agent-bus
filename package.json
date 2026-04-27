@@ -1,7 +1,7 @@
 {
   "name": "agent-comms",
   "version": "1.1.0",
-  "description": "Cross-harness agent communication bus — filesystem-based rooms, DMs, and presence for LLM agents",
+  "description": "Cross-harness agent communication bus \u2014 filesystem-based rooms, DMs, and presence for LLM agents",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "repository": {
@@ -20,7 +20,8 @@
     "rooms",
     "dm",
     "presence",
-    "cross-harness"
+    "cross-harness",
+    "pi-package"
   ],
   "main": "./dist/core/index.js",
   "types": "./dist/core/index.d.ts",
@@ -31,7 +32,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    ".claude-plugin/"
   ],
   "bin": {
     "agent-comms": "dist/cli.js"
@@ -53,6 +55,7 @@
     "@mariozechner/pi-ai": "0.70.2",
     "@mariozechner/pi-coding-agent": "0.70.2",
     "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/exec": "6.0.3",
     "@semantic-release/git": "10.0.1",
     "@semantic-release/github": "12.0.6",
     "@semantic-release/release-notes-generator": "14.1.0",
@@ -73,5 +76,15 @@
     "@modelcontextprotocol/sdk": "1.28.0",
     "typebox": "1.1.28",
     "zod": "4.3.6"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@sinclair/typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/bridges/pi"
+    ]
   }
 }

@@ -1,0 +1,17 @@
+{
+  "name": "agent-comms",
+  "description": "Cross-harness LLM agent communication bus — rooms, DMs, and presence",
+  "version": "1.0.0",
+  "author": {
+    "name": "ExaDev"
+  },
+  "homepage": "https://github.com/ExaDev/agent-comms#readme",
+  "repository": "https://github.com/ExaDev/agent-comms",
+  "license": "MIT",
+  "mcpServers": {
+    "agent-comms": {
+      "command": "npx",
+      "args": ["agent-comms", "bridge", "claude-code"]
+    }
+  }
+}
