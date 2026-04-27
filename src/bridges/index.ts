@@ -1,6 +1,7 @@
 import * as claudeCode from "./claude-code/channel.js";
 import * as codex from "./codex/tool.js";
 import * as codexStop from "./codex/stop_hook.js";
+import * as codexPostToolUse from "./codex/post_tool_use.js";
 
 export interface Bridge {
   run: () => void | Promise<void>;
@@ -10,4 +11,5 @@ export const bridges: Record<string, Bridge> = {
   "claude-code": claudeCode,
   codex,
   "codex-stop": codexStop,
+  "codex-post-tool-use": codexPostToolUse,
 };

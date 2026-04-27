@@ -63,11 +63,12 @@ export const AgentCommsPlugin = async (opts: {
   });
   const agentId = reg.agentId;
 
-  // Watch delivery dir so we know when messages arrive
+  // Watch delivery dir and push immediately when messages arrive
   const deliveryDir = store.deliveryDir(agentId);
   fs.mkdirSync(deliveryDir, { recursive: true });
-  fs.watch(deliveryDir, () => {
-    // Don't push immediately — session.idle will drain
+  fs.watch(deliveryDir, (event, filename) => {
+    if (event !== "rename" || !filename?.endsWith(".json")) return;
+    void drainAndInject();
   });
 
   async function drainAndInject() {

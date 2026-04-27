@@ -46,29 +46,30 @@ const McpServersSchema = z
   })
   .loose();
 
+const hookEntrySchema = z
+  .object({
+    type: z.string(),
+    command: z.string(),
+    timeout: z.number().optional(),
+  })
+  .loose();
+
+const hookGroupSchema = z
+  .array(
+    z
+      .object({
+        hooks: z.array(hookEntrySchema).optional(),
+      })
+      .loose(),
+  )
+  .optional();
+
 const HooksSchema = z
   .object({
     hooks: z
       .object({
-        Stop: z
-          .array(
-            z
-              .object({
-                hooks: z
-                  .array(
-                    z
-                      .object({
-                        type: z.string(),
-                        command: z.string(),
-                        timeout: z.number().optional(),
-                      })
-                      .loose(),
-                  )
-                  .optional(),
-              })
-              .loose(),
-          )
-          .optional(),
+        Stop: hookGroupSchema,
+        PostToolUse: hookGroupSchema,
       })
       .optional(),
   })
@@ -453,32 +454,55 @@ function configureCodex(): void {
     console.log(`  → Created ${tomlPath}`);
   }
 
-  // Add Stop hook for delivery push
+  // Add hooks for delivery push
   const hooksPath = path.join(configDir, "hooks.json");
   const parsed = readJsonFile(hooksPath);
   const hooks = HooksSchema.parse(parsed ?? {});
 
-  const hookEntry = {
+  const stopHookEntry = {
     type: "command",
     command: `npx agent-comms bridge codex-stop`,
     timeout: 10,
   };
+  const postToolUseHookEntry = {
+    type: "command",
+    command: `npx agent-comms bridge codex-post-tool-use`,
+    timeout: 10,
+  };
 
+  // Stop hook
   const stopHooks = hooks.hooks?.Stop ?? [{ hooks: [] }];
-  const firstHook = stopHooks[0];
-  if (firstHook === undefined) return;
-  const innerHooks = firstHook.hooks ?? [];
+  const firstStop = stopHooks[0];
+  if (firstStop === undefined) return;
+  const stopInner = firstStop.hooks ?? [];
 
-  const alreadyHasHook = innerHooks.some((h) =>
+  const alreadyHasStopHook = stopInner.some((h) =>
     h.command.includes("agent-comms"),
   );
-  if (!alreadyHasHook) {
-    innerHooks.push(hookEntry);
-    firstHook.hooks = innerHooks;
-    hooks.hooks = { Stop: stopHooks };
+  if (!alreadyHasStopHook) {
+    stopInner.push(stopHookEntry);
+    firstStop.hooks = stopInner;
+  }
+
+  // PostToolUse hook (fires after every tool call for mid-turn delivery)
+  const postToolUseHooks = hooks.hooks?.PostToolUse ?? [{ hooks: [] }];
+  const firstPostToolUse = postToolUseHooks[0];
+  if (firstPostToolUse === undefined) return;
+  const postToolUseInner = firstPostToolUse.hooks ?? [];
+
+  const alreadyHasPostToolUseHook = postToolUseInner.some((h) =>
+    h.command.includes("agent-comms"),
+  );
+  if (!alreadyHasPostToolUseHook) {
+    postToolUseInner.push(postToolUseHookEntry);
+    firstPostToolUse.hooks = postToolUseInner;
+  }
+
+  if (!alreadyHasStopHook || !alreadyHasPostToolUseHook) {
+    hooks.hooks = { Stop: stopHooks, PostToolUse: postToolUseHooks };
     writeJsonFile(hooksPath, hooks);
   } else {
-    console.log(`  → Hook already in ${hooksPath}`);
+    console.log(`  → Hooks already in ${hooksPath}`);
   }
 }
 
@@ -505,13 +529,24 @@ function removeCodex(): void {
   if (parsed === undefined) return;
   const hooks = HooksSchema.safeParse(parsed);
   if (!hooks.success) return;
-  const stopHooks = hooks.data.hooks?.Stop;
-  if (stopHooks?.[0]?.hooks) {
-    stopHooks[0].hooks = stopHooks[0].hooks.filter(
-      (h) => !h.command.includes("agent-comms"),
-    );
+
+  const hookSections: ("Stop" | "PostToolUse")[] = ["Stop", "PostToolUse"];
+  let removed = false;
+  for (const section of hookSections) {
+    const sectionHooks = hooks.data.hooks?.[section];
+    if (sectionHooks?.[0]?.hooks) {
+      const before = sectionHooks[0].hooks.length;
+      sectionHooks[0].hooks = sectionHooks[0].hooks.filter(
+        (h) =>
+          !h.command.includes("agent-comms") &&
+          !h.command.includes("agent-bus"),
+      );
+      if (sectionHooks[0].hooks.length < before) removed = true;
+    }
+  }
+  if (removed) {
     writeJsonFile(hooksPath, hooks.data);
-    console.log(`  Removed agent-comms hook from ${hooksPath}`);
+    console.log(`  Removed agent-comms hooks from ${hooksPath}`);
   }
 }
 
