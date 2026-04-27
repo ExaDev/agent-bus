@@ -53,21 +53,18 @@ export async function run(): Promise<void> {
     async (rawParams: unknown) => {
       const params = isRecord(rawParams) ? rawParams : {};
       const actionParam = params.action;
-      if (!agentId && actionParam !== "register") {
+      if (!agentId) {
+        const name =
+          actionParam === "register" && typeof params.name === "string"
+            ? params.name
+            : `codex-${nanoid(4)}`;
         const reg = await ensureRegistered({
           cwd: process.cwd(),
           store,
           harness: "codex",
-          defaultName: `codex-${nanoid(4)}`,
+          defaultName: name,
         });
         agentId = reg.agentId;
-      }
-
-      if (!agentId) {
-        return {
-          content: [{ type: "text", text: "Error: failed to register" }],
-          isError: true,
-        };
       }
 
       const action = buildAction(params);
