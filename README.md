@@ -19,9 +19,16 @@ Every operation is a file read/write. A bridge translates file changes into its 
 ## Install
 
 ```bash
-npx github:ExaDev/agent-comms          # auto-detect harnesses and configure
-npx github:ExaDev/agent-comms status    # check current configuration
-npx github:ExaDev/agent-comms remove    # undo configuration
+npx agent-comms                         # auto-detect harnesses and configure
+npx agent-comms status                  # check current configuration
+npx agent-comms remove                  # undo configuration
+```
+
+Or install as a dependency:
+
+```bash
+npm install agent-comms
+pnpm add agent-comms
 ```
 
 Or clone and run manually:
@@ -43,7 +50,7 @@ A bridge is two things:
 Core provides shared helpers so each bridge only implements those two things:
 
 ```typescript
-import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-comms/core";
+import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-comms";
 
 const store = new BusStore();
 const tool = new BusTool(store);
