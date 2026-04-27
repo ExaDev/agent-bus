@@ -1,20 +1,37 @@
 # Agent Comms
 
-Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibility — all via a shared filesystem protocol. No server process required.
+Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibility — via a TCP peer mesh with zero filesystem dependencies.
 
 ## How it works
 
+Each bridge instance is a peer in a TCP mesh on localhost. The first instance to start becomes the **coordinator** (port 19876). Subsequent instances connect to the coordinator, receive the peer list, and establish direct data connections with every other peer.
+
 ```
-~/.agents/bus/              ← shared filesystem (no server process)
-├── registry/
-│   ├── agents/*.json       ← agent identities, visibility, status
-│   └── rooms/*.json        ← room definitions, membership
-├── rooms/{id}/*.json       ← room message history
-├── dms/{a}--{b}/*.json     ← direct message history
-└── delivery/{id}/*.json    ← per-agent push queue (drained by bridges)
+Agent A (pi)                          Agent B (Claude Code)
+   │                                       │
+   │  pi bridge  ◀──TCP localhost──▶  Claude bridge
+   │      │                                │
+   │  agent_comms(                    channel notification
+   │    "send",                             │
+   │    ...                           Claude surfaces it
+   │  )                                to the LLM
+   │      │
+   │  push to B's bridge ───────────▶ handled
 ```
 
-Every operation is a file read/write. A bridge translates file changes into its harness's native push mechanism — the core knows nothing about which harnesses exist.
+All state is held in memory and synchronised between peers. Delivery events are pushed directly over TCP — no polling, no filesystem, no daemon process.
+
+### Coordinator pattern
+
+- **Well-known port** 19876 on localhost — the only agreed-upon constant
+- The first instance to bind it becomes coordinator
+- Coordinator handles introductions only — not a router
+- On graceful shutdown, coordinator hands over to the longest-running peer
+- On crash, remaining peers race to bind the port (~100ms recovery)
+
+### Identity persistence
+
+Peer IDs are persisted to `~/.agents/identity/{harness}--{cwd}.json` so agents can recover their identity across restarts.
 
 ## Install
 
@@ -86,21 +103,30 @@ A bridge is two things:
 Core provides shared helpers so each bridge only implements those two things:
 
 ```typescript
-import { BusStore, BusTool, buildAction, ensureRegistered, drainAndFormat } from "agent-comms";
+import {
+  MeshStore,
+  CommsTool,
+  buildAction,
+  ensureRegistered,
+  formatDeliveryEvent,
+} from "agent-comms";
 
-const store = new BusStore();
-const tool = new BusTool(store);
+const store = new MeshStore();
+const tool = new CommsTool(store);
 
-// 1. Register or recover identity
+// 1. Initialise mesh and register identity
+await store.init();
 const { agentId } = await ensureRegistered({ store, harness: "my-harness", defaultName: "my-agent" });
 
-// 2. Wire tool into your harness
-const action = buildAction(paramsFromToolCall);
-const result = await tool.handle({ agentId, harness: "my-harness", pid: process.pid }, action);
+// 2. Wire delivery callback for real-time push
+store.onDelivery = (_targetId, event) => {
+  const line = formatDeliveryEvent(event);
+  yourHarness.push(`📬 ${line}`);
+};
 
-// 3. Push delivery events when the LLM finishes a turn
-const lines = await drainAndFormat(store, agentId);
-for (const line of lines) await yourHarness.push(`📬 ${line}`);
+// 3. Wire tool into your harness
+const action = buildAction(paramsFromToolCall);
+const result = await tool.handle({ agentId, harness: "my-harness", cwd: process.cwd(), pid: process.pid }, action);
 ```
 
 See `src/bridges/` for working examples.
@@ -148,4 +174,3 @@ agent_comms({ action: "update", visibility: "hidden" })
 | `visible` | ✓ | ✓ | ✓ |
 | `hidden` | ✗ | ✓ (if ID known) | Members only |
 | `ghost` | ✗ | ✗ | ✗ |
-
