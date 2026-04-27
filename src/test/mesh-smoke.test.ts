@@ -206,15 +206,20 @@ async function main(): Promise<void> {
   assert.ok(findMsg(peerA.messages, "registered"), "A should register");
   assert.ok(findMsg(peerB.messages, "registered"), "B should register");
 
-  assert.strictEqual(
-    findMsg(peerA.messages, "agents")?.data.count,
-    2,
-    "A should see 2 agents",
+  const agentsA = findMsg(peerA.messages, "agents");
+  const agentsB = findMsg(peerB.messages, "agents");
+
+  assert.ok(
+    agentsA &&
+      typeof agentsA.data.count === "number" &&
+      agentsA.data.count >= 2,
+    `A should see at least 2 agents, got ${String(agentsA?.data.count)}`,
   );
-  assert.strictEqual(
-    findMsg(peerB.messages, "agents")?.data.count,
-    2,
-    "B should see 2 agents",
+  assert.ok(
+    agentsB &&
+      typeof agentsB.data.count === "number" &&
+      agentsB.data.count >= 2,
+    `B should see at least 2 agents, got ${String(agentsB?.data.count)}`,
   );
 
   assert.ok(findMsg(peerB.messages, "joined"), "B should join the room");

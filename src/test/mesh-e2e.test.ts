@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   console.log("Test: list agents from A...");
   const agentsA = await a.store.listAgents(a.store.peerId);
   console.log(`  A sees ${String(agentsA.length)} agent(s)`);
-  assert.ok(agentsA.length >= 1, "A should see at least itself");
+  assert.ok(agentsA.length >= 1, "A should see at least 1 agent");
 
   // Wait for state sync
   await sleep(200);
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   console.log("Test: list agents from B...");
   const agentsB = await b.store.listAgents(b.store.peerId);
   console.log(`  B sees ${String(agentsB.length)} agent(s)`);
-  assert.ok(agentsB.length >= 1, "B should see at least itself");
+  assert.ok(agentsB.length >= 1, "B should see at least 1 agent");
 
   // --- Test: create room ---
   console.log("Test: create room...");
