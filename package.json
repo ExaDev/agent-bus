@@ -1,6 +1,6 @@
 {
   "name": "agent-comms",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Cross-harness agent communication bus — filesystem-based rooms, DMs, and presence for LLM agents",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
