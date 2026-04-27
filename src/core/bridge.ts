@@ -2,7 +2,7 @@
  * Agent Comms — shared bridge helpers.
  *
  * Every bridge needs the same three things:
- *   1. Build a BusAction from flat tool parameters
+ *   1. Parse tool parameters into a BusAction (via Zod schema)
  *   2. Format a DeliveryEvent as human-readable text
  *   3. Register (or recover) an agent identity
  *
@@ -12,156 +12,150 @@
 
 import type { BusAction, DeliveryEvent, Visibility } from "./types.js";
 import { BusStore } from "./store.js";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
-// Narrowing helpers for params from MCP/pi tool calls
+// Tool parameter schema — single source of truth for MCP input
 // ---------------------------------------------------------------------------
 
-function isString(value: unknown): value is string {
-  return typeof value === "string";
-}
+const VisibilityEnum = z.enum(["visible", "hidden", "ghost"]);
+const StatusEnum = z.enum(["active", "idle", "busy"]);
+const RoomTypeEnum = z.enum(["public", "private", "secret"]);
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every(isString);
-}
+export const MCP_TOOL_PARAMS = z.object({
+  action: z.enum([
+    "register",
+    "update",
+    "whoami",
+    "create_room",
+    "list_rooms",
+    "join_room",
+    "leave_room",
+    "send",
+    "dm",
+    "list_agents",
+    "read_room",
+    "invite",
+    "kick",
+    "destroy_room",
+  ]),
+  name: z.string().optional(),
+  visibility: VisibilityEnum.optional(),
+  tags: z.array(z.string()).optional(),
+  status: StatusEnum.optional(),
+  room: z.string().optional(),
+  type: RoomTypeEnum.optional(),
+  description: z.string().optional(),
+  target: z.string().optional(),
+  content: z.string().optional(),
+  agent: z.string().optional(),
+  since: z.string().optional(),
+  replyTo: z.string().optional(),
+});
 
-function getString(
-  params: Record<string, unknown>,
-  key: string,
-  fallback: string,
-): string {
-  const value = params[key];
-  return isString(value) ? value : fallback;
-}
+export type ToolParams = z.infer<typeof MCP_TOOL_PARAMS>;
 
-function getOptionalString(
-  params: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = params[key];
-  return isString(value) ? value : undefined;
-}
+/**
+ * Zod schema for the MCP tool inputSchema field.
+ * This is the same schema exposed directly for the MCP SDK.
+ */
+export const MCP_TOOL_SCHEMA = MCP_TOOL_PARAMS;
 
-function getOptionalStringArray(
-  params: Record<string, unknown>,
-  key: string,
-): string[] | undefined {
-  const value = params[key];
-  return isStringArray(value) ? value : undefined;
-}
+// ---------------------------------------------------------------------------
+// buildAction — parsed params → typed BusAction
+// ---------------------------------------------------------------------------
 
-function getOptionalEnum<T extends string>(
-  params: Record<string, unknown>,
-  key: string,
-  values: readonly T[],
-): T | undefined {
-  const value = params[key];
-  if (!isString(value)) return undefined;
-  for (const v of values) {
-    if (v === value) return v;
+class BuildActionError extends Error {
+  constructor(public readonly action: string, field: string) {
+    super(`Missing required field "${field}" for action "${action}"`);
+    this.name = "BuildActionError";
   }
-  return undefined;
 }
-
-// ---------------------------------------------------------------------------
-// buildAction — flat params → typed BusAction
-// ---------------------------------------------------------------------------
-
-const VISIBILITY_VALUES = ["visible", "hidden", "ghost"] as const;
-const STATUS_VALUES = ["active", "idle", "busy"] as const;
-const ROOM_TYPE_VALUES = ["public", "private", "secret"] as const;
 
 export function buildAction(params: Record<string, unknown>): BusAction {
-  const action = isString(params.action) ? params.action : "whoami";
+  const parsed = MCP_TOOL_PARAMS.safeParse(params);
+  if (!parsed.success) return { action: "whoami" };
+  const p = parsed.data;
 
-  switch (action) {
+  switch (p.action) {
     case "register":
+      if (p.name === undefined) throw new BuildActionError("register", "name");
       return {
         action: "register",
-        name: getString(params, "name", "unnamed"),
-        visibility:
-          getOptionalEnum(params, "visibility", VISIBILITY_VALUES) ?? "visible",
-        tags: getOptionalStringArray(params, "tags") ?? [],
+        name: p.name,
+        visibility: p.visibility ?? "visible",
+        tags: p.tags ?? [],
       };
     case "update": {
       const update: BusAction & { action: "update" } = { action: "update" };
-      const visibility = getOptionalEnum(
-        params,
-        "visibility",
-        VISIBILITY_VALUES,
-      );
-      if (visibility !== undefined) update.visibility = visibility;
-      const status = getOptionalEnum(params, "status", STATUS_VALUES);
-      if (status !== undefined) update.status = status;
-      const name = getOptionalString(params, "name");
-      if (name !== undefined) update.name = name;
-      const tags = getOptionalStringArray(params, "tags");
-      if (tags !== undefined) update.tags = tags;
+      if (p.visibility !== undefined) update.visibility = p.visibility;
+      if (p.status !== undefined) update.status = p.status;
+      if (p.name !== undefined) update.name = p.name;
+      if (p.tags !== undefined) update.tags = p.tags;
       return update;
     }
     case "whoami":
       return { action: "whoami" };
     case "create_room":
+      if (p.room === undefined) throw new BuildActionError("create_room", "room");
       return {
         action: "create_room",
-        name: getString(params, "room", "unnamed"),
-        type: getOptionalEnum(params, "type", ROOM_TYPE_VALUES) ?? "public",
-        description: getString(params, "description", ""),
+        name: p.room,
+        type: p.type ?? "public",
+        description: p.description ?? "",
       };
     case "list_rooms":
       return { action: "list_rooms" };
     case "join_room":
-      return { action: "join_room", room: getString(params, "room", "") };
+      if (p.room === undefined) throw new BuildActionError("join_room", "room");
+      return { action: "join_room", room: p.room };
     case "leave_room":
-      return { action: "leave_room", room: getString(params, "room", "") };
+      if (p.room === undefined) throw new BuildActionError("leave_room", "room");
+      return { action: "leave_room", room: p.room };
     case "send": {
-      const send: BusAction & { action: "send" } = {
-        action: "send",
-        target:
-          getString(params, "target", "") || getString(params, "room", ""),
-        content: getString(params, "content", ""),
-      };
-      const replyTo = getOptionalString(params, "replyTo");
-      if (replyTo !== undefined) send.replyTo = replyTo;
-      return send;
+      if (p.content === undefined) throw new BuildActionError("send", "content");
+      if (p.target !== undefined) {
+        const send: BusAction & { action: "send" } = { action: "send", target: p.target, content: p.content };
+        if (p.replyTo !== undefined) send.replyTo = p.replyTo;
+        return send;
+      }
+      if (p.room !== undefined) {
+        const send: BusAction & { action: "send" } = { action: "send", target: p.room, content: p.content };
+        if (p.replyTo !== undefined) send.replyTo = p.replyTo;
+        return send;
+      }
+      throw new BuildActionError("send", "target");
     }
-    case "dm":
-      return {
-        action: "dm",
-        target:
-          getString(params, "target", "") || getString(params, "agent", ""),
-        content: getString(params, "content", ""),
-      };
+    case "dm": {
+      if (p.content === undefined) throw new BuildActionError("dm", "content");
+      if (p.target !== undefined) {
+        return { action: "dm", target: p.target, content: p.content };
+      }
+      if (p.agent !== undefined) {
+        return { action: "dm", target: p.agent, content: p.content };
+      }
+      throw new BuildActionError("dm", "target");
+    }
     case "list_agents":
       return { action: "list_agents" };
-    case "read_room": {
-      const read: BusAction & { action: "read_room" } = {
+    case "read_room":
+      if (p.room === undefined) throw new BuildActionError("read_room", "room");
+      return {
         action: "read_room",
-        room: getString(params, "room", ""),
+        room: p.room,
+        ...(p.since !== undefined && { since: p.since }),
       };
-      const since = getOptionalString(params, "since");
-      if (since !== undefined) read.since = since;
-      return read;
-    }
     case "invite":
-      return {
-        action: "invite",
-        room: getString(params, "room", ""),
-        agent: getString(params, "agent", ""),
-      };
+      if (p.room === undefined) throw new BuildActionError("invite", "room");
+      if (p.agent === undefined) throw new BuildActionError("invite", "agent");
+      return { action: "invite", room: p.room, agent: p.agent };
     case "kick":
-      return {
-        action: "kick",
-        room: getString(params, "room", ""),
-        agent: getString(params, "agent", ""),
-      };
+      if (p.room === undefined) throw new BuildActionError("kick", "room");
+      if (p.agent === undefined) throw new BuildActionError("kick", "agent");
+      return { action: "kick", room: p.room, agent: p.agent };
     case "destroy_room":
-      return {
-        action: "destroy_room",
-        room: getString(params, "room", ""),
-      };
-    default:
-      return { action: "whoami" };
+      if (p.room === undefined) throw new BuildActionError("destroy_room", "room");
+      return { action: "destroy_room", room: p.room };
   }
 }
 
@@ -237,64 +231,3 @@ export async function drainAndFormat(
   const events = await store.drainDelivery(agentId);
   return events.map(formatDeliveryEvent);
 }
-
-// ---------------------------------------------------------------------------
-// MCP tool schema — shared across MCP-based bridges (Claude Code, Codex)
-// ---------------------------------------------------------------------------
-
-export const MCP_TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    action: {
-      type: "string" as const,
-      enum: [
-        "register",
-        "update",
-        "whoami",
-        "create_room",
-        "list_rooms",
-        "join_room",
-        "leave_room",
-        "send",
-        "dm",
-        "list_agents",
-        "read_room",
-        "invite",
-        "kick",
-        "destroy_room",
-      ],
-      description: "Action to perform",
-    },
-    name: { type: "string" as const, description: "Agent display name" },
-    visibility: {
-      type: "string" as const,
-      enum: ["visible", "hidden", "ghost"],
-      description: "Visibility to other agents",
-    },
-    tags: {
-      type: "array" as const,
-      items: { type: "string" as const },
-      description: "Agent tags",
-    },
-    status: {
-      type: "string" as const,
-      enum: ["active", "idle", "busy"],
-      description: "Status",
-    },
-    room: { type: "string" as const, description: "Room name/ID" },
-    type: {
-      type: "string" as const,
-      enum: ["public", "private", "secret"],
-      description: "Room type",
-    },
-    description: { type: "string" as const, description: "Room description" },
-    target: { type: "string" as const, description: "Target room or agent ID" },
-    content: { type: "string" as const, description: "Message content" },
-    agent: { type: "string" as const, description: "Target agent ID" },
-    since: {
-      type: "string" as const,
-      description: "ISO timestamp for read_room",
-    },
-  },
-  required: ["action"],
-} as const;

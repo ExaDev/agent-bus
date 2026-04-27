@@ -75,7 +75,7 @@ export const AgentCommsPlugin = async (opts: {
 
     const message = "📬 Agent Comms:\n" + lines.map((l) => `- ${l}`).join("\n");
     try {
-      await client.tui.appendPrompt({ body: { text: message } });
+      await client.tui.appendPrompt({ text: message });
       await client.tui.submitPrompt();
     } catch {
       // Fallback: prompt the current session directly

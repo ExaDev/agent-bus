@@ -15,6 +15,6 @@
     "sourceMap": true,
     "skipLibCheck": true
   },
-  "include": ["src", "eslint.config.ts"],
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }

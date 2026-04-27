@@ -464,14 +464,16 @@ function configureCodex(): void {
   };
 
   const stopHooks = hooks.hooks?.Stop ?? [{ hooks: [] }];
-  const innerHooks = stopHooks[0].hooks ?? [];
+  const firstHook = stopHooks[0];
+  if (firstHook === undefined) return;
+  const innerHooks = firstHook.hooks ?? [];
 
   const alreadyHasHook = innerHooks.some((h) =>
     h.command.includes("agent-comms"),
   );
   if (!alreadyHasHook) {
     innerHooks.push(hookEntry);
-    stopHooks[0].hooks = innerHooks;
+    firstHook.hooks = innerHooks;
     hooks.hooks = { Stop: stopHooks };
     writeJsonFile(hooksPath, hooks);
   } else {
@@ -504,7 +506,7 @@ function removeCodex(): void {
   if (!hooks.success) return;
   const stopHooks = hooks.data.hooks?.Stop;
   if (stopHooks?.[0]?.hooks) {
-    hooks.data.hooks.Stop[0].hooks = stopHooks[0].hooks.filter(
+    stopHooks[0].hooks = stopHooks[0].hooks.filter(
       (h) => !h.command.includes("agent-comms"),
     );
     writeJsonFile(hooksPath, hooks.data);

@@ -12,7 +12,9 @@ export function nanoid(size: number = SIZE): string {
   crypto.getRandomValues(bytes);
   let id = "";
   for (let i = 0; i < size; i++) {
-    id += ALPHABET.charAt(bytes[i] % ALPHABET.length);
+    const byte = bytes[i];
+    if (byte === undefined) continue;
+    id += ALPHABET.charAt(byte % ALPHABET.length);
   }
   return id;
 }
