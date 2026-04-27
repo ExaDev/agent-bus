@@ -82,8 +82,8 @@ export class BusStore {
     return path.join(this.root, "delivery", id);
   }
 
-  identityPath(): string {
-    return path.join(this.root, "identity.json");
+  identityPath(harness: string): string {
+    return path.join(this.root, "identity", `${harness}.json`);
   }
 
   // -------------------------------------------------------------------------
@@ -104,9 +104,9 @@ export class BusStore {
   // Identity
   // -------------------------------------------------------------------------
 
-  async readIdentity(): Promise<{ id: string } | undefined> {
+  async readIdentity(harness: string): Promise<{ id: string } | undefined> {
     try {
-      const raw = await this.readJsonFile(this.identityPath());
+      const raw = await this.readJsonFile(this.identityPath(harness));
       if (typeof raw === "object" && raw !== null && "id" in raw) {
         const id = raw.id;
         if (typeof id === "string") return { id };
@@ -117,8 +117,8 @@ export class BusStore {
     }
   }
 
-  async writeIdentity(id: string): Promise<void> {
-    await this.writeJsonFile(this.identityPath(), { id });
+  async writeIdentity(harness: string, id: string): Promise<void> {
+    await this.writeJsonFile(this.identityPath(harness), { id });
   }
 
   // -------------------------------------------------------------------------
@@ -132,7 +132,7 @@ export class BusStore {
     visibility: Visibility;
     tags: string[];
   }): Promise<AgentIdentity> {
-    const existing = await this.readIdentity();
+    const existing = await this.readIdentity(opts.harness);
     if (existing) {
       return this.updateAgent(existing.id, {
         name: opts.name,
@@ -157,7 +157,7 @@ export class BusStore {
     };
 
     await this.writeJsonFile(this.agentPath(id), agent);
-    await this.writeIdentity(id);
+    await this.writeIdentity(opts.harness, id);
     return agent;
   }
 

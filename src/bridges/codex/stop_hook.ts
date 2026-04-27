@@ -17,7 +17,7 @@ import { DeliveryEventSchema } from "../../core/types.js";
 import type { DeliveryEvent } from "../../core/types.js";
 
 const BUS_ROOT = path.join(os.homedir(), ".agents", "bus");
-const IDENTITY_FILE = path.join(BUS_ROOT, "identity.json");
+const IDENTITY_FILE = path.join(BUS_ROOT, "identity", "codex.json");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

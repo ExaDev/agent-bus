@@ -216,7 +216,7 @@ export async function ensureRegistered(opts: {
 }): Promise<RegistrationResult> {
   await opts.store.init();
 
-  const identity = await opts.store.readIdentity();
+  const identity = await opts.store.readIdentity(opts.harness);
   if (identity) {
     await opts.store.updateAgent(identity.id, {
       status: "active",
