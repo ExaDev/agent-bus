@@ -29,10 +29,11 @@ The [`pi` manifest](/package.json) registers the extension automatically.
 ### Claude Code
 
 ```bash
-claude plugin install agent-comms@<marketplace>
+claude plugin marketplace add https://github.com/ExaDev/agent-comms
+claude plugin install agent-comms@agent-comms
 ```
 
-This requires agent-comms to be listed in a [Claude Code marketplace](https://github.com/anthropics/claude-plugins-official). The [plugin manifest](/.claude-plugin/plugin.json) defines the MCP server.
+This repo serves as its own marketplace. The [plugin manifest](/.claude-plugin/plugin.json) defines the MCP server.
 
 ### Other harnesses
 
