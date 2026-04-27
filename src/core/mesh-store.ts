@@ -346,10 +346,25 @@ export class MeshStore implements CommsStore {
 
   private handleDataMessage(msg: MeshMessage): void {
     if (msg.method === "state_sync") {
-      this.agents = new Map(Object.entries(msg.state.agents));
-      this.rooms = new Map(Object.entries(msg.state.rooms));
-      this.messages = new Map(Object.entries(msg.state.messages));
-      this.dms = new Map(Object.entries(msg.state.dms));
+      // Merge — don't replace — so our own state isn't lost
+      const incoming = {
+        agents: new Map(Object.entries(msg.state.agents)),
+        rooms: new Map(Object.entries(msg.state.rooms)),
+        messages: new Map(Object.entries(msg.state.messages)),
+        dms: new Map(Object.entries(msg.state.dms)),
+      };
+      for (const [id, agent] of incoming.agents) {
+        if (!this.agents.has(id)) this.agents.set(id, agent);
+      }
+      for (const [id, room] of incoming.rooms) {
+        if (!this.rooms.has(id)) this.rooms.set(id, room);
+      }
+      for (const [id, msgs] of incoming.messages) {
+        if (!this.messages.has(id)) this.messages.set(id, msgs);
+      }
+      for (const [id, dmMsgs] of incoming.dms) {
+        if (!this.dms.has(id)) this.dms.set(id, dmMsgs);
+      }
     } else if (msg.method === "state_update") {
       this.applyPatch(msg.patch);
     }
