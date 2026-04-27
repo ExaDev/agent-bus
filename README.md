@@ -29,9 +29,9 @@ All state is held in memory and synchronised between peers. Delivery events are 
 - On graceful shutdown, coordinator hands over to the longest-running peer
 - On crash, remaining peers race to bind the port (~100ms recovery)
 
-### Identity persistence
+### Identity
 
-Peer IDs are persisted to `~/.agents/identity/{harness}--{cwd}.json` so agents can recover their identity across restarts.
+Each instance gets a unique peer ID on startup. Mesh state is in-memory — when a process exits, its peer is gone. Identity is not persisted because the mesh state dies with the process.
 
 ## Install
 

@@ -10,26 +10,12 @@ import { CommsTool } from "../core/tool.js";
 import { buildAction } from "../core/bridge.js";
 import type { DeliveryEvent } from "../core/types.js";
 import * as assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import * as os from "node:os";
-
-const TEST_IDENTITY_DIR = path.join(
-  os.homedir(),
-  ".agents",
-  "identity-test-" + String(Date.now()),
-);
 
 async function createStore(
   name: string,
   harness: string,
 ): Promise<{ store: MeshStore; tool: CommsTool; deliveries: DeliveryEvent[] }> {
   const store = new MeshStore();
-  // Override identity dir to avoid polluting real state
-  Object.defineProperty(store, "identityDir", {
-    value: TEST_IDENTITY_DIR,
-    writable: true,
-  });
 
   const deliveries: DeliveryEvent[] = [];
   store.onDelivery = (_agentId: string, event: DeliveryEvent) => {
@@ -162,13 +148,6 @@ async function main(): Promise<void> {
   console.log("Cleaning up...");
   await a.store.shutdown();
   await b.store.shutdown();
-
-  // Clean up test identity files
-  try {
-    await fs.rm(TEST_IDENTITY_DIR, { recursive: true });
-  } catch {
-    /* ignore */
-  }
 
   console.log("\n✓ All tests passed!");
 }
