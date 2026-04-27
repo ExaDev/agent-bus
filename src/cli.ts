@@ -340,11 +340,19 @@ function removePi(): void {
   const parsed = readJsonFile(settingsPath);
   const settings = PiSettingsSchema.parse(parsed ?? {});
 
-  const bridgeDir = path.join(PKG_DIR, "src", "bridges", "pi");
   const extensions = settings.extensions;
 
   if (extensions) {
-    settings.extensions = extensions.filter((e: string) => e !== bridgeDir);
+    settings.extensions = extensions.filter((e: string) => {
+      const segments = e.toLowerCase().split("/");
+      const busIdx = segments.indexOf("bridges");
+      return !(
+        busIdx !== -1 &&
+        segments[busIdx + 1] === "pi" &&
+        (e.toLowerCase().includes("agent-comms") ||
+          e.toLowerCase().includes("agent-bus"))
+      );
+    });
     writeJsonFile(settingsPath, settings);
   }
 }
