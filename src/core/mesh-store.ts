@@ -11,6 +11,7 @@
 
 import * as net from "node:net";
 import { nanoid } from "./nanoid.js";
+import { CommsError } from "./store.js";
 import type { CommsStore } from "./comms-store.js";
 import type {
   AgentIdentity,
@@ -924,5 +925,3 @@ export class MeshStore implements CommsStore {
     this.coordinatorServer = undefined;
   }
 }
-
-import { CommsError } from "./store.js";
