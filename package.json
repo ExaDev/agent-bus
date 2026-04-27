@@ -42,7 +42,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "build": "tsc",
+    "build": "tsc && printf '#!/usr/bin/env node\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js",
     "lint": "eslint .",
     "test": "node --test dist/test/**/*.test.js",
     "typecheck": "tsc --noEmit"
