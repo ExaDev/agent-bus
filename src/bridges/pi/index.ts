@@ -79,7 +79,7 @@ export default function (pi: ExtensionAPI) {
     if (!agentId) return;
     const lines = await drainAndFormat(store, agentId);
     for (const line of lines) {
-      pi.sendUserMessage(`📬 ${line}`, { deliverAs: "followUp" });
+      pi.sendUserMessage(`📬 ${line}`, { deliverAs: "steer" });
     }
   }
 
