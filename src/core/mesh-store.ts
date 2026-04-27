@@ -146,6 +146,7 @@ export class MeshStore implements CommsStore {
     { socket: net.Socket; buffer: MessageBuffer }
   >();
   private peerInfo = new Map<string, PeerInfo>();
+  private staleCheckTimer: ReturnType<typeof setInterval> | undefined;
 
   onDelivery:
     | ((agentId: string, event: DeliveryEvent) => void | Promise<void>)
@@ -250,6 +251,7 @@ export class MeshStore implements CommsStore {
 
       this.coordinatorServer.listen(COORDINATOR_PORT, COORDINATOR_HOST, () => {
         this.isCoordinator = true;
+        this.startStaleCheck();
         this.peerInfo.set(this.peerId, {
           id: this.peerId,
           port: this.dataPort,
@@ -881,6 +883,54 @@ export class MeshStore implements CommsStore {
   }
 
   // -----------------------------------------------------------------------
+  // Stale agent cleanup (coordinator only)
+  // -----------------------------------------------------------------------
+
+  private startStaleCheck(): void {
+    if (this.staleCheckTimer) return;
+    this.staleCheckTimer = setInterval(() => {
+      void this.probeStaleAgents();
+    }, 5000);
+  }
+
+  private stopStaleCheck(): void {
+    if (this.staleCheckTimer) {
+      clearInterval(this.staleCheckTimer);
+      this.staleCheckTimer = undefined;
+    }
+  }
+
+  private async probeStaleAgents(): Promise<void> {
+    const deadIds: string[] = [];
+
+    for (const [id, agent] of this.agents) {
+      if (agent.status !== "active") continue;
+      if (!this.isProcessAlive(agent.pid)) {
+        deadIds.push(id);
+      }
+    }
+
+    for (const id of deadIds) {
+      const agent = this.agents.get(id);
+      if (agent) {
+        agent.status = "offline";
+        this.agents.set(id, agent);
+      }
+      await this.broadcastPatch({ type: "agent_offline", agentId: id });
+    }
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    try {
+      // Sending signal 0 doesn't kill the process — it just checks existence
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Coordinator handover
   // -----------------------------------------------------------------------
 
@@ -908,6 +958,7 @@ export class MeshStore implements CommsStore {
       await writeAsync(peer.socket, encode(msg));
     }
 
+    this.stopStaleCheck();
     this.coordinatorServer?.close();
     this.coordinatorServer = undefined;
     this.isCoordinator = false;
@@ -934,6 +985,7 @@ export class MeshStore implements CommsStore {
     }
     this.peerConnections.clear();
 
+    this.stopStaleCheck();
     this.dataServer?.close();
     this.dataServer = undefined;
     this.coordinatorServer?.close();
