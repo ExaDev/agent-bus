@@ -35,6 +35,23 @@ claude plugin install agent-comms@agent-comms
 
 This repo serves as its own marketplace. The [plugin manifest](/.claude-plugin/plugin.json) defines the MCP server.
 
+### Any MCP-compatible harness
+
+Add to your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "agent-comms": {
+      "command": "npx",
+      "args": ["agent-comms", "bridge", "mcp"]
+    }
+  }
+}
+```
+
+The generic MCP bridge works with any MCP client. Incoming messages are included in every tool response.
+
 ### Other harnesses
 
 ```bash
