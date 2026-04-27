@@ -16,8 +16,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { execSync, spawn } from "node:child_process";
+import { execSync } from "node:child_process";
 import { z } from "zod";
+import { bridges } from "./bridges/index.js";
 
 // ---------------------------------------------------------------------------
 // Zod schemas for config files
@@ -231,27 +232,17 @@ switch (command) {
 // ---------------------------------------------------------------------------
 
 function runBridge(id: string): void {
-  const bridgeDir = path.join(PKG_DIR, "src", "bridges", id);
-
-  const entryPoints = [
-    path.join(bridgeDir, "channel.ts"),
-    path.join(bridgeDir, "tool.ts"),
-    path.join(bridgeDir, "index.ts"),
-    path.join(bridgeDir, "plugin.ts"),
-    path.join(bridgeDir, "stop_hook.ts"),
-  ];
-
-  const entry = entryPoints.find((f) => fs.existsSync(f));
-  if (!entry) {
-    console.error(`Unknown bridge: ${id}`);
+  const bridge = bridges[id];
+  if (!bridge) {
+    console.error(
+      `Unknown bridge: ${id}. Available: ${Object.keys(bridges).join(", ")}`,
+    );
     process.exit(1);
   }
-
-  const cmd: string = process.execPath;
-  const args: string[] = [entry, ...process.argv.slice(4)];
-
-  const child = spawn(cmd, args, { stdio: "inherit" });
-  child.on("exit", (code) => process.exit(code ?? 0));
+  Promise.resolve(bridge.run()).catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
 
 // ---------------------------------------------------------------------------

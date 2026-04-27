@@ -81,29 +81,30 @@ function formatEvent(event: DeliveryEvent): string {
   }
 }
 
-// Read Codex hook input from stdin, then drain and respond
-const chunks: string[] = [];
-process.stdin.setEncoding("utf-8");
-process.stdin.on("data", (chunk: string) => chunks.push(chunk));
-process.stdin.on("end", () => {
-  try {
-    JSON.parse(chunks.join(""));
-  } catch {
-    /* no input, fine */
-  }
+export function run(): void {
+  const chunks: string[] = [];
+  process.stdin.setEncoding("utf-8");
+  process.stdin.on("data", (chunk: string) => chunks.push(chunk));
+  process.stdin.on("end", () => {
+    try {
+      JSON.parse(chunks.join(""));
+    } catch {
+      /* no input, fine */
+    }
 
-  const agentId = readIdentity();
-  if (!agentId) process.exit(0);
+    const agentId = readIdentity();
+    if (!agentId) process.exit(0);
 
-  const events = drainDelivery(agentId);
-  if (events.length === 0) process.exit(0);
+    const events = drainDelivery(agentId);
+    if (events.length === 0) process.exit(0);
 
-  const lines = events.map(formatEvent);
-  const message =
-    "📬 Agent Comms pending messages:\n" +
-    lines.map((l) => `- ${l}`).join("\n");
+    const lines = events.map(formatEvent);
+    const message =
+      "📬 Agent Comms pending messages:\n" +
+      lines.map((l) => `- ${l}`).join("\n");
 
-  process.stdout.write(
-    JSON.stringify({ decision: "block", reason: message }, null, 2) + "\n",
-  );
-});
+    process.stdout.write(
+      JSON.stringify({ decision: "block", reason: message }, null, 2) + "\n",
+    );
+  });
+}
