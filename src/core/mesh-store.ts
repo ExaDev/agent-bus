@@ -9,6 +9,9 @@
  * Falls back to FileStore if the mesh is unavailable.
  */
 
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import * as net from "node:net";
 import { nanoid } from "./nanoid.js";
 import type { CommsStore } from "./comms-store.js";
@@ -134,7 +137,7 @@ export class MeshStore implements CommsStore {
   private messages = new Map<string, RoomMessage[]>();
   private dms = new Map<string, DmMessage[]>();
   private deliveryQueues = new Map<string, DeliveryEvent[]>();
-  private identityCache = new Map<string, { id: string }>();
+  private identityDir = path.join(os.homedir(), ".agents", "identity");
 
   private dataServer: net.Server | undefined;
   private dataPort = 0;
@@ -491,13 +494,26 @@ export class MeshStore implements CommsStore {
     harness: string,
     cwd: string,
   ): Promise<{ id: string } | undefined> {
-    await Promise.resolve();
-    return this.identityCache.get(`${harness}--${cwd}`);
+    const key = `${harness}--${cwd.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const filePath = path.join(this.identityDir, `${key}.json`);
+    try {
+      const raw = await fs.readFile(filePath, "utf-8");
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null && "id" in parsed) {
+        const id = parsed.id;
+        if (typeof id === "string") return { id };
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async writeIdentity(harness: string, cwd: string, id: string): Promise<void> {
-    await Promise.resolve();
-    this.identityCache.set(`${harness}--${cwd}`, { id });
+    const key = `${harness}--${cwd.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const filePath = path.join(this.identityDir, `${key}.json`);
+    await fs.mkdir(this.identityDir, { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify({ id }), "utf-8");
   }
 
   // -----------------------------------------------------------------------
