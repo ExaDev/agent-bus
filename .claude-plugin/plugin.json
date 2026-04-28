@@ -1,7 +1,7 @@
 {
   "name": "agent-comms",
   "description": "Cross-harness LLM agent communication bus — rooms, DMs, and presence",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": {
     "name": "ExaDev"
   },
@@ -11,7 +11,11 @@
   "mcpServers": {
     "agent-comms": {
       "command": "npx",
-      "args": ["agent-comms", "bridge", "claude-code"]
+      "args": [
+        "agent-comms",
+        "bridge",
+        "claude-code"
+      ]
     }
   }
 }
