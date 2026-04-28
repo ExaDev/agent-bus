@@ -431,6 +431,7 @@ export class FileStore implements CommsStore {
       content,
       timestamp: new Date().toISOString(),
       replyTo,
+      readBy: [from],
     };
 
     await fs.mkdir(this.roomMessagesDir(roomId), { recursive: true });
@@ -492,6 +493,7 @@ export class FileStore implements CommsStore {
       to,
       content,
       timestamp: new Date().toISOString(),
+      readBy: [from],
     };
 
     const dir = this.dmDir(from, to);

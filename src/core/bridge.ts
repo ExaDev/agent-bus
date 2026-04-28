@@ -198,6 +198,8 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
     }
     case "member_status":
       return `${event.agent} is now ${event.status} in ${event.room}`;
+    case "delivery_status":
+      return `Message ${event.messageId} ${event.status} by ${event.agent}${event.room ? ` in ${event.room}` : ""}`;
   }
 }
 

@@ -103,6 +103,7 @@ export const RoomMessageSchema = defineSchema(
     content: z.string(),
     timestamp: z.string(),
     replyTo: z.string().optional(),
+    readBy: z.array(z.string()),
   }),
 );
 export type RoomMessage = z.infer<typeof RoomMessageSchema>;
@@ -114,9 +115,15 @@ export const DmMessageSchema = defineSchema(
     to: z.string(),
     content: z.string(),
     timestamp: z.string(),
+    readBy: z.array(z.string()),
   }),
 );
 export type DmMessage = z.infer<typeof DmMessageSchema>;
+
+export const DeliveryStatus = defineSchema(
+  z.union([z.literal("delivered"), z.literal("read")]),
+);
+export type DeliveryStatus = z.infer<typeof DeliveryStatus>;
 
 // ---------------------------------------------------------------------------
 // Delivery events
@@ -166,6 +173,13 @@ export const DeliveryEventSchema = defineSchema(
       room: z.string(),
       agent: z.string(),
       status: AgentStatus,
+    }),
+    z.object({
+      type: z.literal("delivery_status"),
+      messageId: z.string(),
+      agent: z.string(),
+      status: DeliveryStatus,
+      room: z.string().optional(),
     }),
   ]),
 );

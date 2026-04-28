@@ -17,6 +17,7 @@ import type {
   AgentIdentity,
   AgentStatus,
   DeliveryEvent,
+  DeliveryStatus,
   DmMessage,
   Room,
   RoomMessage,
@@ -66,7 +67,8 @@ type MeshStatePatch =
   | { type: "room_delete"; roomId: string }
   | { type: "message_add"; roomId: string; message: RoomMessage }
   | { type: "dm_add"; key: string; message: DmMessage }
-  | { type: "delivery"; agentId: string; event: DeliveryEvent };
+  | { type: "delivery"; agentId: string; event: DeliveryEvent }
+  | { type: "message_read"; messageId: string; readBy: string; room?: string };
 
 // ---------------------------------------------------------------------------
 // Framing
@@ -334,7 +336,7 @@ export class MeshStore implements CommsStore {
       const items = buffer.append(data.toString());
       for (const item of items) {
         if (isMeshMessage(item)) {
-          this.handleDataMessage(item);
+          void this.handleDataMessage(item);
           if (item.method === "pong") {
             remotePeerId = item.peerId;
           }
@@ -353,7 +355,7 @@ export class MeshStore implements CommsStore {
     });
   }
 
-  private handleDataMessage(msg: MeshMessage): void {
+  private async handleDataMessage(msg: MeshMessage): Promise<void> {
     if (msg.method === "state_sync") {
       // Merge — don't replace — so our own state isn't lost
       const incoming = {
@@ -375,11 +377,11 @@ export class MeshStore implements CommsStore {
         if (!this.dms.has(id)) this.dms.set(id, dmMsgs);
       }
     } else if (msg.method === "state_update") {
-      this.applyPatch(msg.patch);
+      await this.applyPatch(msg.patch);
     }
   }
 
-  private applyPatch(patch: MeshStatePatch): void {
+  private async applyPatch(patch: MeshStatePatch): Promise<void> {
     switch (patch.type) {
       case "agent_upsert":
         this.agents.set(patch.agent.id, patch.agent);
@@ -416,7 +418,21 @@ export class MeshStore implements CommsStore {
         this.deliveryQueues.set(patch.agentId, arr);
         if (patch.agentId === this.peerId && this.onDelivery) {
           void this.onDelivery(patch.agentId, patch.event);
+          // Auto-mark read — push bridges consume immediately
+          if (patch.event.type === "room_message") {
+            await this.markRead(
+              patch.event.message.id,
+              this.peerId,
+              patch.event.message.room,
+            );
+          } else if (patch.event.type === "dm") {
+            await this.markRead(patch.event.message.id, this.peerId);
+          }
         }
+        break;
+      }
+      case "message_read": {
+        this.applyReadReceipt(patch.messageId, patch.readBy, patch.room);
         break;
       }
     }
@@ -453,7 +469,7 @@ export class MeshStore implements CommsStore {
             const items = buf.append(data.toString());
             for (const item of items) {
               if (isMeshMessage(item)) {
-                this.handleDataMessage(item);
+                void this.handleDataMessage(item);
               }
             }
           });
@@ -499,8 +515,27 @@ export class MeshStore implements CommsStore {
     const arr = this.deliveryQueues.get(agentId) ?? [];
     arr.push(event);
     this.deliveryQueues.set(agentId, arr);
+
+    // Auto-emit delivered status for messages
+    if (event.type === "room_message") {
+      await this.emitDeliveryStatus(
+        event.message.id,
+        agentId,
+        "delivered",
+        event.message.room,
+      );
+    } else if (event.type === "dm") {
+      await this.emitDeliveryStatus(event.message.id, agentId, "delivered");
+    }
+
     if (agentId === this.peerId && this.onDelivery) {
       void this.onDelivery(agentId, event);
+      // Auto-mark read — push bridges consume immediately
+      if (event.type === "room_message") {
+        await this.markRead(event.message.id, agentId, event.message.room);
+      } else if (event.type === "dm") {
+        await this.markRead(event.message.id, agentId);
+      }
     }
 
     // Remote delivery
@@ -534,6 +569,101 @@ export class MeshStore implements CommsStore {
         agent: agentId,
         status,
       });
+    }
+  }
+
+  private async emitDeliveryStatus(
+    messageId: string,
+    agentId: string,
+    status: DeliveryStatus,
+    room?: string,
+  ): Promise<void> {
+    // Find the sender for this message
+    const senderId = this.findMessageSender(messageId, room);
+    if (!senderId) return;
+    await this.deliverLocallyAndBroadcast(senderId, {
+      type: "delivery_status",
+      messageId,
+      agent: agentId,
+      status,
+      room,
+    });
+  }
+
+  private findMessageSender(
+    messageId: string,
+    room?: string,
+  ): string | undefined {
+    if (room) {
+      const msgs = this.messages.get(room);
+      if (msgs) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg) return msg.from;
+      }
+    } else {
+      // DM — search all DM queues
+      for (const [, msgs] of this.dms) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg) return msg.from;
+      }
+    }
+    return undefined;
+  }
+
+  private async markRead(
+    messageId: string,
+    readBy: string,
+    room?: string,
+  ): Promise<void> {
+    // Update local message state
+    if (room) {
+      const msgs = this.messages.get(room);
+      if (msgs) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg && !msg.readBy.includes(readBy)) {
+          msg.readBy.push(readBy);
+        }
+      }
+    } else {
+      for (const [, msgs] of this.dms) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg && !msg.readBy.includes(readBy)) {
+          msg.readBy.push(readBy);
+        }
+      }
+    }
+
+    // Notify sender
+    await this.emitDeliveryStatus(messageId, readBy, "read", room);
+
+    // Propagate to other peers
+    await this.broadcastPatch(
+      room
+        ? { type: "message_read", messageId, readBy, room }
+        : { type: "message_read", messageId, readBy },
+    );
+  }
+
+  private applyReadReceipt(
+    messageId: string,
+    readBy: string,
+    room?: string,
+  ): void {
+    if (room) {
+      const msgs = this.messages.get(room);
+      if (msgs) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg && !msg.readBy.includes(readBy)) {
+          msg.readBy.push(readBy);
+        }
+      }
+    } else {
+      for (const [, msgs] of this.dms) {
+        const msg = msgs.find((m) => m.id === messageId);
+        if (msg && !msg.readBy.includes(readBy)) {
+          msg.readBy.push(readBy);
+        }
+      }
     }
   }
 
@@ -873,6 +1003,7 @@ export class MeshStore implements CommsStore {
       content,
       timestamp: new Date().toISOString(),
       replyTo,
+      readBy: [from],
     };
 
     const arr = this.messages.get(roomId) ?? [];
@@ -922,6 +1053,7 @@ export class MeshStore implements CommsStore {
       to,
       content,
       timestamp: new Date().toISOString(),
+      readBy: [from],
     };
 
     const key = dmKey(from, to);
@@ -946,6 +1078,16 @@ export class MeshStore implements CommsStore {
     await Promise.resolve();
     const events = this.deliveryQueues.get(agentId) ?? [];
     this.deliveryQueues.set(agentId, []);
+
+    // Auto-mark messages as read — drain bridges consume on tool call
+    for (const event of events) {
+      if (event.type === "room_message") {
+        await this.markRead(event.message.id, agentId, event.message.room);
+      } else if (event.type === "dm") {
+        await this.markRead(event.message.id, agentId);
+      }
+    }
+
     return events;
   }
 
