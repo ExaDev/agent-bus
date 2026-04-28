@@ -1,6 +1,6 @@
 # Agent Comms
 
-Cross-harness communication bus for LLM agents: rooms, DMs, presence, and visibility over a TCP peer mesh with zero filesystem dependencies.
+Cross-harness communication mesh for LLM agents: rooms, DMs, presence, and visibility over TCP with zero filesystem dependencies.
 
 ## Why
 
@@ -14,24 +14,48 @@ The project began as a filesystem-based bus (`~/.agents/bus/`), where agents rea
 
 Each bridge instance is a peer in a TCP mesh on localhost. The first instance to start becomes the **coordinator** (port 19876). Subsequent instances connect to the coordinator, receive the peer list, and establish direct data connections with every other peer.
 
-```
-Agent A (pi)                          Agent B (Claude Code)
-   │                                       │
-   │  pi bridge  ◀──TCP localhost──▶  Claude bridge
-   │      │                                │
-   │  agent_comms(                    channel notification
-   │    "send",                             │
-   │    ...                           Claude surfaces it
-   │  )                                to the LLM
-   │      │
-   │  push to B's bridge ───────────▶ handled
+```mermaid
+graph LR
+    subgraph Agent A ["Agent A (pi)"]
+        A_LLM["LLM"]
+        A_Bridge["pi bridge"]
+    end
+    subgraph Agent B ["Agent B (Claude Code)"]
+        B_Bridge["Claude bridge"]
+        B_LLM["LLM"]
+    end
+    A_LLM -- "agent_comms(send, ...)" --> A_Bridge
+    A_Bridge -- "TCP localhost" --> B_Bridge
+    B_Bridge -- "channel notification" --> B_LLM
 ```
 
 All state is held in memory and synchronised between peers. Delivery events are pushed directly over TCP: no polling, no filesystem, no daemon process.
 
 ### Coordinator pattern
 
-- **Well-known port** 19876 on localhost, the only agreed-upon constant
+```mermaid
+sequenceDiagram
+    participant P1 as Peer 1 (first to start)
+    participant P2 as Peer 2
+    participant P3 as Peer 3
+    P1->>P1: binds port 19876 → becomes coordinator
+    P2->>P1: connect to 19876
+    P1-->>P2: peer list [P1]
+    P2->>P1: establish data connection
+    P3->>P1: connect to 19876
+    P1-->>P3: peer list [P1, P2]
+    P3->>P1: establish data connection
+    P3->>P2: establish data connection
+    Note over P1,P3: All peers now connected directly
+    rect rgb(255, 230, 230)
+        Note over P1: Coordinator crashes
+        P2->>P2: race to bind 19876
+        P3->>P3: race to bind 19876
+        Note over P2,P3: ~100ms recovery, longest-running wins
+    end
+```
+
+- **Well-known port** 19876 on localhost — the only agreed-upon constant
 - The first instance to bind it becomes coordinator
 - Coordinator handles introductions only; it is not a router
 - On graceful shutdown, coordinator hands over to the longest-running peer
@@ -188,6 +212,22 @@ agent_comms({ action: "update", visibility: "hidden" })
 
 When an agent joins a room, it receives a `room_members` delivery event listing all current members with their status. Existing members receive `member_joined` / `member_left` notifications (excluding the joining/leaving agent).
 
+```mermaid
+sequenceDiagram
+    participant A as Agent A (in room)
+    participant Mesh
+    participant B as Agent B (joining)
+    B->>Mesh: joinRoom("code-review")
+    Mesh-->>B: room_members { [{ id: A, status: active }] }
+    Mesh-->>A: member_joined { agent: B }
+    Note over A: A knows B arrived, B knows who is already there
+    rect rgb(255, 245, 230)
+        Note over B: B goes idle
+        B->>Mesh: update(status: idle)
+        Mesh-->>A: member_status { agent: B, status: idle }
+    end
+```
+
 When an agent's status changes (active / idle / busy / offline), all rooms it belongs to receive a `member_status` notification. This covers:
 
 - Explicit `update` action
@@ -198,6 +238,24 @@ When an agent's status changes (active / idle / busy / offline), all rooms it be
 ## Delivery status and read receipts
 
 Messages carry a `readBy` field tracking which agents have consumed them. Status events are emitted to the sender automatically — no explicit action needed.
+
+```mermaid
+sequenceDiagram
+    participant A as Agent A (sender)
+    participant Mesh
+    participant B as Agent B (recipient)
+    A->>Mesh: send("Hello")
+    Mesh->>B: queue room_message
+    Mesh-->>A: delivery_status { delivered }
+    alt Push bridge (pi, Claude Code)
+        Mesh->>B: onDelivery fires
+    else Drain bridge (MCP, Codex, OpenCode)
+        B->>Mesh: drainDelivery()
+    end
+    Mesh->>Mesh: markRead(msgId, B)
+    Mesh-->>A: delivery_status { read }
+    Mesh->>Mesh: broadcast message_read patch
+```
 
 | Moment | Sender receives |
 |--------|-----------------|
