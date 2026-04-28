@@ -7,6 +7,13 @@
  *   npx agent-comms status       # check current configuration
  *   npx agent-comms remove       # undo configuration
  *   npx agent-comms bridge <id>  # run a bridge (used by harness configs)
+ *   npx agent-comms chat         # interactive TUI
+ *   npx agent-comms chat --web   # web UI
+ *   npx agent-comms send <room> <message>   # one-shot send
+ *   npx agent-comms dm <agent> <message>     # one-shot DM
+ *   npx agent-comms rooms                     # list rooms
+ *   npx agent-comms agents                    # list agents
+ *   npx agent-comms read <room>               # read room messages
  *
  * The bridge subcommand lets harnesses invoke the bridge via npx:
  *   .mcp.json:  { "command": "npx", "args": ["agent-comms", "bridge", "claude-code"] }
@@ -19,6 +26,9 @@ import * as os from "node:os";
 import { execSync } from "node:child_process";
 import { z } from "zod";
 import { bridges } from "./bridges/index.js";
+import { runTui } from "./bridges/user/tui.js";
+import { runWeb } from "./bridges/user/web/server.js";
+import { runCli } from "./bridges/user/cli.js";
 
 // ---------------------------------------------------------------------------
 // Zod schemas for config files
@@ -194,8 +204,24 @@ switch (command) {
     runBridge(bridgeId);
     break;
   }
+  case "chat": {
+    const chatArgs = process.argv.slice(3);
+    runChat(chatArgs);
+    break;
+  }
+  case "send":
+  case "dm":
+  case "rooms":
+  case "agents":
+  case "read": {
+    const cliArgs = process.argv.slice(3);
+    runUserCli(command, cliArgs);
+    break;
+  }
   default:
-    console.log("Usage: agent-comms [setup|status|remove|bridge <id>]");
+    console.log(
+      "Usage: agent-comms [setup|status|remove|bridge <id>|chat|send|dm|rooms|agents|read]",
+    );
     process.exit(1);
 }
 
@@ -212,6 +238,47 @@ function runBridge(id: string): void {
     process.exit(1);
   }
   Promise.resolve(bridge.run()).catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+function parseNameArg(args: string[]): { name: string; rest: string[] } {
+  const nameIdx = args.indexOf("--name");
+  if (nameIdx !== -1) {
+    const val = args[nameIdx + 1];
+    if (val !== undefined) {
+      return {
+        name: val,
+        rest: [...args.slice(0, nameIdx), ...args.slice(nameIdx + 2)],
+      };
+    }
+  }
+  return { name: "Joe", rest: args };
+}
+
+function runChat(args: string[]): void {
+  const { name, rest } = parseNameArg(args);
+  const web = rest.includes("--web");
+  const portIdx = rest.indexOf("--port");
+  const port = portIdx !== -1 ? Number(rest[portIdx + 1]) : 3000;
+
+  if (web) {
+    runWeb(name, port).catch((err: unknown) => {
+      console.error(err);
+      process.exit(1);
+    });
+  } else {
+    runTui(name).catch((err: unknown) => {
+      console.error(err);
+      process.exit(1);
+    });
+  }
+}
+
+function runUserCli(command: string, args: string[]): void {
+  const { name, rest } = parseNameArg(args);
+  runCli(command, rest, name).catch((err: unknown) => {
     console.error(err);
     process.exit(1);
   });
