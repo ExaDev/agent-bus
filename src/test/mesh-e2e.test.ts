@@ -11,11 +11,13 @@ import { buildAction } from "../core/bridge.js";
 import type { DeliveryEvent } from "../core/types.js";
 import * as assert from "node:assert/strict";
 
+const E2E_PORT = 19878;
+
 async function createStore(
   name: string,
   harness: string,
 ): Promise<{ store: MeshStore; tool: CommsTool; deliveries: DeliveryEvent[] }> {
-  const store = new MeshStore();
+  const store = new MeshStore(E2E_PORT);
 
   const deliveries: DeliveryEvent[] = [];
   store.onDelivery = (_agentId: string, event: DeliveryEvent) => {

@@ -10,8 +10,8 @@ import * as assert from "node:assert/strict";
 import * as child_process from "node:child_process";
 import * as net from "node:net";
 
-const COORDINATOR_PORT = 19876;
-const COORDINATOR_HOST = "127.0.0.1";
+const SMOKE_PORT = 19877;
+const SMOKE_HOST = "127.0.0.1";
 
 interface TestMessage {
   type: string;
@@ -89,7 +89,7 @@ function buildScript(name: string, actions: string): string {
     `const { CommsTool } = require("./dist/core/tool.js");`,
     `function log(msg) { process.stdout.write(JSON.stringify(msg) + "\\n"); }`,
     `(async () => {`,
-    `  const store = new MeshStore();`,
+    `  const store = new MeshStore(${String(SMOKE_PORT)});`,
     `  const tool = new CommsTool(store);`,
     `  const deliveries = [];`,
     `  store.onDelivery = (_id, event) => {`,
@@ -171,8 +171,8 @@ async function main(): Promise<void> {
 
   // Wait for A to bind coordinator port
   await sleep(500);
-  await waitForPort(COORDINATOR_PORT, COORDINATOR_HOST);
-  console.log("  Coordinator bound on port 19876");
+  await waitForPort(SMOKE_PORT, SMOKE_HOST);
+  console.log("  Coordinator bound on port " + String(SMOKE_PORT));
 
   console.log("Spawning peer B (joins mesh)...");
   const peerB = spawnPeer(

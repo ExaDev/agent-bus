@@ -27,7 +27,7 @@ import type {
 // Constants
 // ---------------------------------------------------------------------------
 
-const COORDINATOR_PORT = 19876;
+const DEFAULT_COORDINATOR_PORT = 19876;
 const COORDINATOR_HOST = "127.0.0.1";
 
 // ---------------------------------------------------------------------------
@@ -129,6 +129,7 @@ function writeAsync(socket: net.Socket, data: string): Promise<void> {
 export class MeshStore implements CommsStore {
   readonly peerId: string;
   readonly startedAt: string;
+  readonly coordinatorPort: number;
 
   private agents = new Map<string, AgentIdentity>();
   private rooms = new Map<string, Room>();
@@ -152,9 +153,10 @@ export class MeshStore implements CommsStore {
     | ((agentId: string, event: DeliveryEvent) => void | Promise<void>)
     | undefined;
 
-  constructor() {
+  constructor(coordinatorPort: number = DEFAULT_COORDINATOR_PORT) {
     this.peerId = nanoid(8);
     this.startedAt = new Date().toISOString();
+    this.coordinatorPort = coordinatorPort;
   }
 
   // -----------------------------------------------------------------------
@@ -193,7 +195,7 @@ export class MeshStore implements CommsStore {
   private connectToCoordinator(): Promise<void> {
     return new Promise((resolve, reject) => {
       const socket = net.createConnection(
-        { port: COORDINATOR_PORT, host: COORDINATOR_HOST },
+        { port: this.coordinatorPort, host: COORDINATOR_HOST },
         () => {
           const intro: MeshMessage = {
             method: "introduce",
@@ -249,16 +251,20 @@ export class MeshStore implements CommsStore {
         this.handleCoordinatorConnection(socket);
       });
 
-      this.coordinatorServer.listen(COORDINATOR_PORT, COORDINATOR_HOST, () => {
-        this.isCoordinator = true;
-        this.startStaleCheck();
-        this.peerInfo.set(this.peerId, {
-          id: this.peerId,
-          port: this.dataPort,
-          startedAt: this.startedAt,
-        });
-        resolve();
-      });
+      this.coordinatorServer.listen(
+        this.coordinatorPort,
+        COORDINATOR_HOST,
+        () => {
+          this.isCoordinator = true;
+          this.startStaleCheck();
+          this.peerInfo.set(this.peerId, {
+            id: this.peerId,
+            port: this.dataPort,
+            startedAt: this.startedAt,
+          });
+          resolve();
+        },
+      );
 
       this.coordinatorServer.on("error", (err: unknown) => {
         const isAddrInUse =
