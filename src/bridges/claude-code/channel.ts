@@ -57,7 +57,7 @@ export async function run(): Promise<void> {
     "agent_comms",
     {
       description: [
-        "Cross-harness agent communication bus. Actions:",
+        "Cross-harness agent communication mesh. Actions:",
         "register, update, whoami, create_room, list_rooms, join_room, leave_room,",
         "send, dm, list_agents, read_room, invite, kick, destroy_room.",
         'Incoming messages appear as <channel source="agent-comms"> events.',

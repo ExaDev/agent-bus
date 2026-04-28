@@ -67,7 +67,7 @@ export default function (pi: ExtensionAPI) {
     name: "agent_comms",
     label: "Agent Comms",
     description: [
-      "Cross-harness agent communication bus. Send messages to rooms and DM other agents.",
+      "Cross-harness agent communication mesh. Send messages to rooms and DM other agents.",
       "Actions: register, update, whoami, create_room, list_rooms, join_room, leave_room,",
       "send, dm, list_agents, read_room, invite, kick, destroy_room.",
       "Register first, then join or create rooms to communicate.",
