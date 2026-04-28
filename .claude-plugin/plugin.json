@@ -1,6 +1,6 @@
 {
   "name": "agent-comms",
-  "description": "Cross-harness LLM agent communication bus — rooms, DMs, and presence",
+  "description": "Cross-harness LLM agent communication mesh — rooms, DMs, and presence",
   "version": "1.4.2",
   "author": {
     "name": "ExaDev"
