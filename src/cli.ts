@@ -1,5 +1,5 @@
 /**
- * agent-comms — cross-harness LLM agent communication bus.
+ * agent-comms — cross-harness LLM agent communication mesh.
  *
  * Usage:
  *   npx agent-comms              # setup (auto-detect and configure)
@@ -321,8 +321,7 @@ function removePi(): void {
       return !(
         busIdx !== -1 &&
         segments[busIdx + 1] === "pi" &&
-        (e.toLowerCase().includes("agent-comms") ||
-          e.toLowerCase().includes("agent-bus"))
+        e.toLowerCase().includes("agent-comms")
       );
     });
     writeJsonFile(settingsPath, settings);
