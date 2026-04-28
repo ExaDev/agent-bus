@@ -1,6 +1,14 @@
 # Agent Comms
 
-Cross-harness communication bus for LLM agents. Rooms, DMs, presence, and visibility — via a TCP peer mesh with zero filesystem dependencies.
+Cross-harness communication bus for LLM agents: rooms, DMs, presence, and visibility over a TCP peer mesh with zero filesystem dependencies.
+
+## Why
+
+LLM agents on the same machine are isolated silos. A Claude Code session cannot see a pi session running in the next terminal. A Codex agent cannot ask a Claude agent to review its work. Each harness manages its own context, tools, and state, with no shared communication layer between them.
+
+Agent Comms gives them one. Any agent, in any harness, can register itself, discover other agents, join rooms, send direct messages, and coordinate work, all over a lightweight TCP mesh on localhost.
+
+The project began as a filesystem-based bus (`~/.agents/bus/`), where agents read and wrote JSON files to communicate. This worked but brought real problems: orphaned files from crashed agents, polling overhead, concurrent write races, and complex stale-agent detection. The key insight that shaped the current design was that each MCP server instance is already a running process. The bridge processes themselves can form the mesh, with no daemon, no filesystem, and no polling.
 
 ## How it works
 
@@ -19,19 +27,19 @@ Agent A (pi)                          Agent B (Claude Code)
    │  push to B's bridge ───────────▶ handled
 ```
 
-All state is held in memory and synchronised between peers. Delivery events are pushed directly over TCP — no polling, no filesystem, no daemon process.
+All state is held in memory and synchronised between peers. Delivery events are pushed directly over TCP: no polling, no filesystem, no daemon process.
 
 ### Coordinator pattern
 
-- **Well-known port** 19876 on localhost — the only agreed-upon constant
+- **Well-known port** 19876 on localhost, the only agreed-upon constant
 - The first instance to bind it becomes coordinator
-- Coordinator handles introductions only — not a router
+- Coordinator handles introductions only; it is not a router
 - On graceful shutdown, coordinator hands over to the longest-running peer
 - On crash, remaining peers race to bind the port (~100ms recovery)
 
 ### Identity
 
-Each instance gets a unique peer ID on startup. Mesh state is in-memory — when a process exits, its peer is gone. Identity is not persisted because the mesh state dies with the process.
+Each instance gets a unique peer ID on startup. Mesh state is in-memory; when a process exits, its peer is gone. Identity is not persisted because the mesh state dies with the process.
 
 ## Install
 
@@ -84,11 +92,12 @@ npm install agent-comms
 pnpm add agent-comms
 ```
 
-Or clone and run manually:
+Or clone and build from source:
 
 ```bash
 git clone https://github.com/ExaDev/agent-comms.git
-cd agent-comms && node bin/setup.mjs
+cd agent-comms && pnpm install && pnpm build
+npx agent-comms                         # auto-detect and configure
 ```
 
 The CLI detects which harnesses are installed (pi, Claude Code, Codex, OpenCode) and writes the appropriate config files automatically.
@@ -97,8 +106,8 @@ The CLI detects which harnesses are installed (pi, Claude Code, Codex, OpenCode)
 
 A bridge is two things:
 
-1. **A tool** — so the LLM can call `agent_comms({ action: "send", ... })`
-2. **A push mechanism** — so incoming delivery events reach the LLM's context
+1. **A tool**, so the LLM can call `agent_comms({ action: "send", ... })`
+2. **A push mechanism**, so incoming delivery events reach the LLM's context
 
 Core provides shared helpers so each bridge only implements those two things:
 
