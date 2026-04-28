@@ -157,8 +157,9 @@ async function main(): Promise<void> {
   const peerA = spawnPeer(
     "a",
     [
+      `const roomId = "smoke-room-" + Date.now();`,
       `const room = await store.createRoom({`,
-      `  name: "smoke-room", type: "public", owner: agent.id,`,
+      `  name: roomId, type: "public", owner: agent.id,`,
       `  description: "Smoke test room",`,
       `});`,
       `log({ type: "room_created", data: { id: room.id } });`,
@@ -179,7 +180,7 @@ async function main(): Promise<void> {
     [
       `await new Promise(r => setTimeout(r, 800));`,
       `const existingRooms = await store.listRooms(agent.id);`,
-      `const smokeRoom = existingRooms.find(r => r.name === "smoke-room");`,
+      `const smokeRoom = existingRooms.find(r => r.name.startsWith("smoke-room"));`,
       `if (smokeRoom) {`,
       `  await store.joinRoom(smokeRoom.id, agent.id);`,
       `  log({ type: "joined", data: { room: smokeRoom.id } });`,

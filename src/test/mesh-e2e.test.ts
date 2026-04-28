@@ -66,8 +66,9 @@ async function main(): Promise<void> {
 
   // --- Test: create room ---
   console.log("Test: create room...");
+  const roomId = `test-room-${String(Date.now())}`;
   const room = await a.store.createRoom({
-    name: "test-room",
+    name: roomId,
     type: "public",
     owner: a.store.peerId,
     description: "Test room",
