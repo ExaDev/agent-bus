@@ -1,7 +1,7 @@
 /**
- * Filesystem layout for the agent bus.
+ * Filesystem layout for agent comms.
  *
- * All paths are relative to a configurable bus root (default: ~/.agents/bus/).
+ * All paths are relative to a configurable comms root (default: ~/.agents/comms/).
  * Every operation is a file read/write — no server process needed.
  * JSON.parse boundaries use Zod schemas for type-safe parsing.
  */
@@ -53,7 +53,7 @@ export class CommsError extends Error {
 
 export class FileStore implements CommsStore {
   constructor(
-    public readonly root: string = path.join(os.homedir(), ".agents", "bus"),
+    public readonly root: string = path.join(os.homedir(), ".agents", "comms"),
   ) {}
 
   // -------------------------------------------------------------------------
@@ -562,7 +562,7 @@ export class FileStore implements CommsStore {
   }
 
   // -------------------------------------------------------------------------
-  // Bus initialisation
+  // Comms initialisation
   // -------------------------------------------------------------------------
 
   async init(): Promise<void> {
