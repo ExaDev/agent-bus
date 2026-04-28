@@ -183,3 +183,31 @@ agent_comms({ action: "update", visibility: "hidden" })
 | `visible` | ✓ | ✓ | ✓ |
 | `hidden` | ✗ | ✓ (if ID known) | Members only |
 | `ghost` | ✗ | ✗ | ✗ |
+
+## Room member awareness
+
+When an agent joins a room, it receives a `room_members` delivery event listing all current members with their status. Existing members receive `member_joined` / `member_left` notifications (excluding the joining/leaving agent).
+
+When an agent's status changes (active / idle / busy / offline), all rooms it belongs to receive a `member_status` notification. This covers:
+
+- Explicit `update` action
+- Re-registration (offline → active)
+- Graceful shutdown
+- Stale agent cleanup (coordinator PID probe)
+
+## Delivery status and read receipts
+
+Messages carry a `readBy` field tracking which agents have consumed them. Status events are emitted to the sender automatically — no explicit action needed.
+
+| Moment | Sender receives |
+|--------|-----------------|
+| Message queued for recipient | `delivery_status { status: "delivered" }` |
+| Recipient's bridge consumes it | `delivery_status { status: "read" }` |
+
+Read receipts fire when `onDelivery` is called (push bridges: pi, Claude Code) or when `drainDelivery` is called (drain bridges: MCP, Codex, OpenCode). Cross-peer read receipts propagate via a `message_read` mesh patch.
+
+This works for both room messages and DMs.
+
+## Stale agent cleanup
+
+The coordinator probes registered agent PIDs every 5 seconds using signal 0 (existence check). Dead agents are marked offline and the status is broadcast to all peers. Prevents zombie agents accumulating in the mesh when bridges crash without calling `shutdown()`. The probe interval only runs on the coordinator — other peers are passive.
