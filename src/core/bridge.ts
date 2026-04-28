@@ -190,6 +190,14 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
       return `${event.agent} joined ${event.room}`;
     case "member_left":
       return `${event.agent} left ${event.room}`;
+    case "room_members": {
+      const names = event.members
+        .map((m) => `${m.name} (${m.status})`)
+        .join(", ");
+      return `Room ${event.room} members: ${names}`;
+    }
+    case "member_status":
+      return `${event.agent} is now ${event.status} in ${event.room}`;
   }
 }
 

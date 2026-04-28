@@ -122,6 +122,15 @@ export type DmMessage = z.infer<typeof DmMessageSchema>;
 // Delivery events
 // ---------------------------------------------------------------------------
 
+export const RoomMemberSchema = defineSchema(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    status: AgentStatus,
+  }),
+);
+export type RoomMember = z.infer<typeof RoomMemberSchema>;
+
 export const DeliveryEventSchema = defineSchema(
   z.discriminatedUnion("type", [
     z.object({
@@ -146,6 +155,17 @@ export const DeliveryEventSchema = defineSchema(
       type: z.literal("member_left"),
       room: z.string(),
       agent: z.string(),
+    }),
+    z.object({
+      type: z.literal("room_members"),
+      room: z.string(),
+      members: z.array(RoomMemberSchema),
+    }),
+    z.object({
+      type: z.literal("member_status"),
+      room: z.string(),
+      agent: z.string(),
+      status: AgentStatus,
     }),
   ]),
 );

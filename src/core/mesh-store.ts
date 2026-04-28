@@ -15,6 +15,7 @@ import { CommsError } from "./store.js";
 import type { CommsStore } from "./comms-store.js";
 import type {
   AgentIdentity,
+  AgentStatus,
   DeliveryEvent,
   DmMessage,
   Room,
@@ -507,6 +508,35 @@ export class MeshStore implements CommsStore {
     await this.broadcastPatch(patch);
   }
 
+  private async deliverToRoom(
+    roomId: string,
+    event: DeliveryEvent,
+    excludeAgent?: string,
+  ): Promise<void> {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    for (const memberId of room.members) {
+      if (memberId === excludeAgent) continue;
+      await this.deliverLocallyAndBroadcast(memberId, event);
+    }
+  }
+
+  private async notifyRoomsOfStatus(
+    agentId: string,
+    status: AgentStatus,
+  ): Promise<void> {
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+    for (const roomId of agent.subscribedRooms) {
+      await this.deliverToRoom(roomId, {
+        type: "member_status",
+        room: roomId,
+        agent: agentId,
+        status,
+      });
+    }
+  }
+
   // -----------------------------------------------------------------------
   // CommsStore — Identity
   // -----------------------------------------------------------------------
@@ -581,9 +611,15 @@ export class MeshStore implements CommsStore {
     if (!agent)
       throw new CommsError(`Agent ${id} not found`, "AGENT_NOT_FOUND");
 
+    const oldStatus = agent.status;
     Object.assign(agent, patch);
     this.agents.set(id, agent);
     await this.broadcastPatch({ type: "agent_upsert", agent });
+
+    if (patch.status && patch.status !== oldStatus) {
+      await this.notifyRoomsOfStatus(id, patch.status);
+    }
+
     return agent;
   }
 
@@ -602,6 +638,7 @@ export class MeshStore implements CommsStore {
     if (agent) {
       agent.status = "offline";
       this.agents.set(id, agent);
+      await this.notifyRoomsOfStatus(id, "offline");
       await this.broadcastPatch({ type: "agent_offline", agentId: id });
     }
 
@@ -686,11 +723,35 @@ export class MeshStore implements CommsStore {
     }
 
     await this.broadcastPatch({ type: "room_upsert", room });
-    await this.deliverLocallyAndBroadcast(roomId, {
-      type: "member_joined",
+
+    // Send current member list to the joining agent
+    const members: { id: string; name: string; status: AgentStatus }[] = [];
+    for (const memberId of room.members) {
+      const memberAgent = this.agents.get(memberId);
+      if (memberAgent) {
+        members.push({
+          id: memberAgent.id,
+          name: memberAgent.name,
+          status: memberAgent.status,
+        });
+      }
+    }
+    await this.deliverLocallyAndBroadcast(agentId, {
+      type: "room_members",
       room: roomId,
-      agent: agentId,
+      members,
     });
+
+    // Notify existing members of the join
+    await this.deliverToRoom(
+      roomId,
+      {
+        type: "member_joined",
+        room: roomId,
+        agent: agentId,
+      },
+      agentId,
+    );
 
     return room;
   }
@@ -713,7 +774,7 @@ export class MeshStore implements CommsStore {
     }
 
     await this.broadcastPatch({ type: "room_upsert", room });
-    await this.deliverLocallyAndBroadcast(roomId, {
+    await this.deliverToRoom(roomId, {
       type: "member_left",
       room: roomId,
       agent: agentId,
@@ -921,6 +982,7 @@ export class MeshStore implements CommsStore {
       if (agent) {
         agent.status = "offline";
         this.agents.set(id, agent);
+        await this.notifyRoomsOfStatus(id, "offline");
       }
       await this.broadcastPatch({ type: "agent_offline", agentId: id });
     }
