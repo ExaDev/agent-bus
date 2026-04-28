@@ -4,7 +4,7 @@
 		"name": "ExaDev"
 	},
 	"metadata": {
-		"description": "Cross-harness communication bus for LLM agents",
+		"description": "Cross-harness communication mesh for LLM agents",
 		"homepage": "https://github.com/ExaDev/agent-comms#readme"
 	},
 	"plugins": [
@@ -14,7 +14,7 @@
 				"source": "url",
 				"url": "https://github.com/ExaDev/agent-comms.git"
 			},
-			"description": "Cross-harness LLM agent communication bus — rooms, DMs, and presence",
+			"description": "Cross-harness LLM agent communication mesh — rooms, DMs, and presence",
 			"version": "1.1.0"
 		}
 	]
