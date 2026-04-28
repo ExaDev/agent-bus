@@ -13,6 +13,7 @@ import {
   ensureRegistered,
   formatDeliveryEvent,
 } from "../../core/index.js";
+import { tryStartWebServer } from "../user/web/server.js";
 import { nanoid } from "../../core/nanoid.js";
 
 const store = new MeshStore();
@@ -52,6 +53,7 @@ export const AgentCommsPlugin = async (opts: {
   const client = opts.client;
 
   await store.init();
+  await tryStartWebServer();
 
   const reg = await ensureRegistered({
     cwd: process.cwd(),

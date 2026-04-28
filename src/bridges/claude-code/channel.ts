@@ -20,6 +20,7 @@ import {
   formatDeliveryEvent,
   MCP_TOOL_PARAMS,
 } from "../../core/index.js";
+import { tryStartWebServer } from "../user/web/server.js";
 import { nanoid } from "../../core/nanoid.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +105,7 @@ export async function run(): Promise<void> {
   // -----------------------------------------------------------------------
 
   await store.init();
+  await tryStartWebServer();
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({

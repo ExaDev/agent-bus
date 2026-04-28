@@ -18,6 +18,7 @@ import {
   ensureRegistered,
   formatDeliveryEvent,
 } from "../../core/index.js";
+import { tryStartWebServer } from "../user/web/server.js";
 import { nanoid } from "../../core/nanoid.js";
 
 export default function (pi: ExtensionAPI) {
@@ -38,6 +39,9 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     await store.init();
+
+    // Auto-start web UI (first bridge to bind port 3000 wins)
+    await tryStartWebServer();
 
     const reg = await ensureRegistered({
       store,

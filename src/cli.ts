@@ -7,8 +7,7 @@
  *   npx agent-comms status       # check current configuration
  *   npx agent-comms remove       # undo configuration
  *   npx agent-comms bridge <id>  # run a bridge (used by harness configs)
- *   npx agent-comms chat         # interactive TUI
- *   npx agent-comms chat --web   # web UI
+ *   npx agent-comms chat         # interactive TUI (web UI auto-starts)
  *   npx agent-comms send <room> <message>   # one-shot send
  *   npx agent-comms dm <agent> <message>     # one-shot DM
  *   npx agent-comms rooms                     # list rooms
@@ -27,7 +26,6 @@ import { execSync } from "node:child_process";
 import { z } from "zod";
 import { bridges } from "./bridges/index.js";
 import { runTui } from "./bridges/user/tui.js";
-import { runWeb } from "./bridges/user/web/server.js";
 import { runCli } from "./bridges/user/cli.js";
 
 // ---------------------------------------------------------------------------
@@ -258,22 +256,11 @@ function parseNameArg(args: string[]): { name: string; rest: string[] } {
 }
 
 function runChat(args: string[]): void {
-  const { name, rest } = parseNameArg(args);
-  const web = rest.includes("--web");
-  const portIdx = rest.indexOf("--port");
-  const port = portIdx !== -1 ? Number(rest[portIdx + 1]) : 3000;
-
-  if (web) {
-    runWeb(name, port).catch((err: unknown) => {
-      console.error(err);
-      process.exit(1);
-    });
-  } else {
-    runTui(name).catch((err: unknown) => {
-      console.error(err);
-      process.exit(1);
-    });
-  }
+  const { name } = parseNameArg(args);
+  runTui(name).catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
 
 function runUserCli(command: string, args: string[]): void {

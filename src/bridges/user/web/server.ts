@@ -17,15 +17,79 @@
  */
 
 import * as http from "node:http";
+import * as net from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { ChatController } from "../controller.js";
 import { FRONTEND_HTML } from "./index.html.js";
 
-const DEFAULT_PORT = 3000;
+const DEFAULT_WEB_PORT = 3000;
+const WEB_HOST = "127.0.0.1";
+
+// ---------------------------------------------------------------------------
+// Auto-start — called by every bridge after MeshStore.init()
+// ---------------------------------------------------------------------------
+
+/**
+ * Try to start the web UI server on the well-known port.
+ * Returns the server if this bridge won the race, or undefined if another
+ * bridge is already serving. The server runs independently with its own
+ * MeshStore that syncs state from the mesh.
+ */
+export async function tryStartWebServer(
+  port = DEFAULT_WEB_PORT,
+): Promise<http.Server | undefined> {
+  const alive = await isPortAlive(port, WEB_HOST);
+  if (alive) return undefined;
+
+  const server = createWebServer(port);
+  return server;
+}
+
+/**
+ * Create and start the web server. Used by tryStartWebServer (auto-start)
+ * and runWeb (standalone `npx agent-comms chat` mode).
+ */
+export function createWebServer(port = DEFAULT_WEB_PORT): http.Server {
+  const controller = new ChatController("Dashboard");
+  void controller.init();
+
+  const server = http.createServer((req, res) => {
+    handleRequest(req, res, controller);
+  });
+
+  const wss = new WebSocketServer({ server });
+  wss.on("connection", (ws) => {
+    handleWebSocket(ws, controller);
+  });
+
+  server.listen(port, WEB_HOST, () => {
+    console.log(`Agent Comms web UI: http://${WEB_HOST}:${String(port)}`);
+  });
+
+  return server;
+}
+
+function isPortAlive(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.connect(port, host, () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Standalone mode — `npx agent-comms chat`
+// ---------------------------------------------------------------------------
 
 export async function runWeb(
   userName: string,
-  port = DEFAULT_PORT,
+  port = DEFAULT_WEB_PORT,
 ): Promise<void> {
   const controller = new ChatController(userName);
   await controller.init();
