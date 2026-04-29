@@ -242,8 +242,13 @@ function handleDelivery(event) {
         addSystem('Members: ' + event.members.map(m => m.name + ' (' + m.status + ')').join(', '));
       }
       break;
-    case 'room_invite':
-      addSystem('Invited to ' + event.room + ' by ' + event.from);
+    case 'room_invite': {
+      const desc = event.roomDescription ? ' — ' + event.roomDescription : '';
+      addSystem(event.fromName + ' invited you to "' + event.room + '"' + desc);
+      break;
+    }
+    case 'invite_declined':
+      addSystem(event.agentName + ' declined invite to ' + event.room + ': "' + event.reason + '"');
       break;
   }
 }

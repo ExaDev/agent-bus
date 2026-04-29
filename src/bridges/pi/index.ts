@@ -73,7 +73,7 @@ export default function (pi: ExtensionAPI) {
     description: [
       "Cross-harness agent communication mesh. Send messages to rooms and DM other agents.",
       "Actions: register, update, whoami, create_room, list_rooms, join_room, leave_room,",
-      "send, dm, list_agents, read_room, invite, kick, destroy_room.",
+      "send, dm, list_agents, read_room, invite, decline_invite, kick, destroy_room.",
       "Register first, then join or create rooms to communicate.",
     ].join(" "),
     promptSnippet: "Communicate with other LLM agents via rooms and DMs",
@@ -95,6 +95,7 @@ export default function (pi: ExtensionAPI) {
           "list_agents",
           "read_room",
           "invite",
+          "decline_invite",
           "kick",
           "destroy_room",
         ],
@@ -140,6 +141,11 @@ export default function (pi: ExtensionAPI) {
       since: Type.Optional(
         Type.String({
           description: "ISO timestamp to read messages since",
+        }),
+      ),
+      reason: Type.Optional(
+        Type.String({
+          description: "Reason for declining an invite (for decline_invite)",
         }),
       ),
     }),

@@ -334,6 +334,13 @@ async function executeAction(
         return { content: "Missing room or agent", isError: true };
       return controller.invite(room, agent);
     }
+    case "decline_invite": {
+      const room = getString(params, "room");
+      const reason = getString(params, "reason");
+      if (!room || !reason)
+        return { content: "Missing room or reason", isError: true };
+      return controller.declineInvite(room, reason);
+    }
     case "kick": {
       const room = getString(params, "room");
       const agent = getString(params, "agent");

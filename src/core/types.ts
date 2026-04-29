@@ -185,6 +185,13 @@ export const DeliveryEventSchema = defineSchema(
       status: DeliveryStatus,
       room: z.string().optional(),
     }),
+    z.object({
+      type: z.literal("invite_declined"),
+      room: z.string(),
+      agent: z.string(),
+      agentName: z.string(),
+      reason: z.string(),
+    }),
   ]),
 );
 export type DeliveryEvent = z.infer<typeof DeliveryEventSchema>;
@@ -250,6 +257,11 @@ export const CommsActionSchema = defineSchema(
       action: z.literal("kick"),
       room: z.string(),
       agent: z.string(),
+    }),
+    z.object({
+      action: z.literal("decline_invite"),
+      room: z.string(),
+      reason: z.string(),
     }),
     z.object({
       action: z.literal("destroy_room"),

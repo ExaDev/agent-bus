@@ -60,6 +60,8 @@ export class CommsTool {
           return await this.readRoom(ctx, action);
         case "invite":
           return await this.invite(ctx, action);
+        case "decline_invite":
+          return await this.declineInvite(ctx, action);
         case "kick":
           return await this.kick(ctx, action);
         case "destroy_room":
@@ -268,6 +270,17 @@ export class CommsTool {
     await this.store.inviteToRoom(action.room, action.agent, ctx.agentId);
     return {
       content: `Invited ${action.agent} to ${action.room}.`,
+      isError: false,
+    };
+  }
+
+  private async declineInvite(
+    ctx: CommsContext,
+    action: CommsAction & { action: "decline_invite" },
+  ): Promise<CommsResult> {
+    await this.store.declineInvite(action.room, ctx.agentId, action.reason);
+    return {
+      content: `Declined invite to ${action.room}.`,
       isError: false,
     };
   }

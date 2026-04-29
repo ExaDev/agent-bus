@@ -10,6 +10,7 @@
  *   /dm <agent> <msg> Send a direct message
  *   /create <name>    Create a public room
  *   /invite <room> <agent>  Invite an agent to a room
+ *   /decline <room> <reason> Decline a room invite
  *   /kick <room> <agent>    Kick an agent from a room
  *   /destroy <room>   Destroy a room
  *   /help             Show commands
@@ -181,6 +182,18 @@ async function handleCommand(input: string, c: ChatController): Promise<void> {
       printResult(result);
       return;
     }
+    case "decline": {
+      const reason = parts.slice(2).join(" ");
+      if (!arg1 || !reason) {
+        process.stdout.write(
+          `${YELLOW}Usage: /decline <room> <reason>${RESET}\n`,
+        );
+        return;
+      }
+      const result = await c.declineInvite(arg1, reason);
+      printResult(result);
+      return;
+    }
     case "kick": {
       const agentId = parts[2];
       if (!arg1 || !agentId) {
@@ -210,6 +223,7 @@ async function handleCommand(input: string, c: ChatController): Promise<void> {
   ${GREEN}/dm${RESET} <agent> <msg>    Send a direct message
   ${GREEN}/create${RESET} <name>       Create a public room
   ${GREEN}/invite${RESET} <room> <id>  Invite agent to room
+  ${GREEN}/decline${RESET} <room> <reason> Decline a room invite
   ${GREEN}/kick${RESET} <room> <id>    Kick agent from room
   ${GREEN}/destroy${RESET} <room>      Destroy a room
   ${GREEN}/help${RESET}                Show this help
@@ -252,8 +266,14 @@ function formatForTerminal(event: DeliveryEvent): string {
       return `${CYAN}● ${event.agent} is now ${event.status} in ${event.room}${RESET}`;
     case "delivery_status":
       return `${DIM}✓ Message ${event.messageId} ${event.status} by ${event.agent}${RESET}`;
-    case "room_invite":
-      return `${CYAN}_invite to ${event.room} from ${event.from}${RESET}`;
+    case "room_invite": {
+      const desc = event.roomDescription
+        ? ` — ${event.roomDescription}`
+        : "";
+      return `${CYAN}✉ ${event.fromName} invited you to "${event.room}"${desc}${RESET}`;
+    }
+    case "invite_declined":
+      return `${YELLOW}✗ ${event.agentName} declined invite to ${event.room}: "${event.reason}"${RESET}`;
     case "room_members": {
       const names = event.members
         .map((m) => `${m.name} (${m.status})`)

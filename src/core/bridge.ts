@@ -36,6 +36,7 @@ export const MCP_TOOL_PARAMS = z.object({
     "list_agents",
     "read_room",
     "invite",
+    "decline_invite",
     "kick",
     "destroy_room",
   ]),
@@ -51,6 +52,7 @@ export const MCP_TOOL_PARAMS = z.object({
   agent: z.string().optional(),
   since: z.string().optional(),
   replyTo: z.string().optional(),
+  reason: z.string().optional(),
 });
 
 export type ToolParams = z.infer<typeof MCP_TOOL_PARAMS>;
@@ -163,6 +165,12 @@ export function buildAction(params: Record<string, unknown>): CommsAction {
       if (p.room === undefined) throw new BuildActionError("invite", "room");
       if (p.agent === undefined) throw new BuildActionError("invite", "agent");
       return { action: "invite", room: p.room, agent: p.agent };
+    case "decline_invite":
+      if (p.room === undefined)
+        throw new BuildActionError("decline_invite", "room");
+      if (p.reason === undefined)
+        throw new BuildActionError("decline_invite", "reason");
+      return { action: "decline_invite", room: p.room, reason: p.reason };
     case "kick":
       if (p.room === undefined) throw new BuildActionError("kick", "room");
       if (p.agent === undefined) throw new BuildActionError("kick", "agent");
@@ -207,6 +215,8 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
       return `${event.agent} is now ${event.status} in ${event.room}`;
     case "delivery_status":
       return `Message ${event.messageId} ${event.status} by ${event.agent}${event.room ? ` in ${event.room}` : ""}`;
+    case "invite_declined":
+      return `${event.agentName} declined invite to ${event.room}: "${event.reason}"`;
   }
 }
 

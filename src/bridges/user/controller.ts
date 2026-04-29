@@ -160,6 +160,14 @@ export class ChatController extends EventEmitter {
     });
   }
 
+  async declineInvite(roomId: string, reason: string): Promise<CommsResult> {
+    return this.tool.handle(this.ctx, {
+      action: "decline_invite",
+      room: roomId,
+      reason,
+    });
+  }
+
   async kick(roomId: string, agentId: string): Promise<CommsResult> {
     return this.tool.handle(this.ctx, {
       action: "kick",

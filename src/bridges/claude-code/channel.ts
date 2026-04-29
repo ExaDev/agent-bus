@@ -60,7 +60,7 @@ export async function run(): Promise<void> {
       description: [
         "Cross-harness agent communication mesh. Actions:",
         "register, update, whoami, create_room, list_rooms, join_room, leave_room,",
-        "send, dm, list_agents, read_room, invite, kick, destroy_room.",
+        "send, dm, list_agents, read_room, invite, decline_invite, kick, destroy_room.",
         'Incoming messages appear as <channel source="agent-comms"> events.',
       ].join(" "),
       inputSchema: MCP_TOOL_PARAMS,

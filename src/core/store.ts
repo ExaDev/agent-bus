@@ -373,6 +373,34 @@ export class FileStore implements CommsStore {
     });
   }
 
+  async declineInvite(
+    roomId: string,
+    agentId: string,
+    reason: string,
+  ): Promise<void> {
+    const room = await this.getRoom(roomId);
+    if (!room)
+      throw new CommsError(`Room ${roomId} not found`, "ROOM_NOT_FOUND");
+
+    if (!room.invited.includes(agentId))
+      throw new CommsError(
+        `Agent ${agentId} was not invited to ${roomId}`,
+        "NOT_INVITED",
+      );
+
+    room.invited = room.invited.filter((id) => id !== agentId);
+    await this.writeJsonFile(this.roomPath(roomId), room);
+
+    const decliner = await this.getAgent(agentId);
+    await this.deliver(room.owner, {
+      type: "invite_declined",
+      room: roomId,
+      agent: agentId,
+      agentName: decliner?.name ?? agentId,
+      reason,
+    });
+  }
+
   async kickFromRoom(
     roomId: string,
     targetId: string,
