@@ -184,8 +184,15 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
       return `[${event.message.room}] ${event.message.from}: ${event.message.content}`;
     case "dm":
       return `DM from ${event.message.from}: ${event.message.content}`;
-    case "room_invite":
-      return `Invited to room ${event.room} by ${event.from}`;
+    case "room_invite": {
+      const desc = event.roomDescription
+        ? ` — ${event.roomDescription}`
+        : "";
+      const who = event.fromCwd
+        ? `${event.fromName} (${event.fromCwd})`
+        : event.fromName;
+      return `${who} invited you to room "${event.room}"${desc}`;
+    }
     case "member_joined":
       return `${event.agent} joined ${event.room}`;
     case "member_left":
