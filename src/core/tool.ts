@@ -224,12 +224,23 @@ export class CommsTool {
     if (agents.length === 0)
       return { content: "No other agents online.", isError: false };
 
+    const homedir = process.env["HOME"] ?? "";
+    const abbreviateCwd = (cwd: string): string =>
+      homedir && cwd.startsWith(homedir)
+        ? `~${cwd.slice(homedir.length)}`
+        : cwd;
+
     const lines = agents.map((a: AgentIdentity) => {
       const self = a.id === ctx.agentId ? " (you)" : "";
-      return `${a.id}  ${a.name.padEnd(25)} ${a.harness.padEnd(12)} ${a.status.padEnd(7)} ${a.visibility}${self}`;
+      const cwd = abbreviateCwd(a.cwd);
+      const rooms =
+        a.subscribedRooms.length > 0
+          ? a.subscribedRooms.join(", ")
+          : "none";
+      return `${a.id}  ${a.name.padEnd(25)} ${a.harness.padEnd(12)} ${a.status.padEnd(7)} ${a.visibility.padEnd(9)} ${cwd}${self}\n        Rooms: ${rooms}`;
     });
     return {
-      content: `Agents:\n  ID      Name                      Harness      Status  Visibility\n${lines.map((l) => `  ${l}`).join("\n")}`,
+      content: `Agents:\n  ID      Name                      Harness      Status  Visibility  CWD\n${lines.map((l) => `  ${l}`).join("\n")}`,
       isError: false,
     };
   }
