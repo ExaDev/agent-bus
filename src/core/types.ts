@@ -152,7 +152,10 @@ export const DeliveryEventSchema = defineSchema(
     z.object({
       type: z.literal("room_invite"),
       room: z.string(),
+      roomDescription: z.string(),
       from: z.string(),
+      fromName: z.string(),
+      fromCwd: z.string(),
     }),
     z.object({
       type: z.literal("member_joined"),

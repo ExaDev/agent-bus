@@ -933,10 +933,14 @@ export class MeshStore implements CommsStore {
     this.rooms.set(roomId, room);
     await this.broadcastPatch({ type: "room_upsert", room });
 
+    const inviter = this.agents.get(inviterId);
     await this.deliverLocallyAndBroadcast(targetId, {
       type: "room_invite",
       room: roomId,
+      roomDescription: room.description,
       from: inviterId,
+      fromName: inviter?.name ?? inviterId,
+      fromCwd: inviter?.cwd ?? "",
     });
   }
 

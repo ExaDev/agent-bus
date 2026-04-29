@@ -362,10 +362,14 @@ export class FileStore implements CommsStore {
     }
     await this.writeJsonFile(this.roomPath(roomId), room);
 
+    const inviter = await this.getAgent(inviterId);
     await this.deliver(targetId, {
       type: "room_invite",
       room: roomId,
+      roomDescription: room.description,
       from: inviterId,
+      fromName: inviter?.name ?? inviterId,
+      fromCwd: inviter?.cwd ?? "",
     });
   }
 
