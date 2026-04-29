@@ -267,9 +267,7 @@ function formatForTerminal(event: DeliveryEvent): string {
     case "delivery_status":
       return `${DIM}✓ Message ${event.messageId} ${event.status} by ${event.agent}${RESET}`;
     case "room_invite": {
-      const desc = event.roomDescription
-        ? ` — ${event.roomDescription}`
-        : "";
+      const desc = event.roomDescription ? ` — ${event.roomDescription}` : "";
       return `${CYAN}✉ ${event.fromName} invited you to "${event.room}"${desc}${RESET}`;
     }
     case "invite_declined":

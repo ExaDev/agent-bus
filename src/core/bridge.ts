@@ -193,9 +193,7 @@ export function formatDeliveryEvent(event: DeliveryEvent): string {
     case "dm":
       return `DM from ${event.message.from}: ${event.message.content}`;
     case "room_invite": {
-      const desc = event.roomDescription
-        ? ` — ${event.roomDescription}`
-        : "";
+      const desc = event.roomDescription ? ` — ${event.roomDescription}` : "";
       const who = event.fromCwd
         ? `${event.fromName} (${event.fromCwd})`
         : event.fromName;

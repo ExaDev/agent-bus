@@ -61,11 +61,7 @@ export interface CommsStore {
     targetId: string,
     inviterId: string,
   ): Promise<void>;
-  declineInvite(
-    roomId: string,
-    agentId: string,
-    reason: string,
-  ): Promise<void>;
+  declineInvite(roomId: string, agentId: string, reason: string): Promise<void>;
   kickFromRoom(
     roomId: string,
     targetId: string,

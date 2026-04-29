@@ -226,7 +226,7 @@ export class CommsTool {
     if (agents.length === 0)
       return { content: "No other agents online.", isError: false };
 
-    const homedir = process.env["HOME"] ?? "";
+    const homedir = process.env.HOME ?? "";
     const abbreviateCwd = (cwd: string): string =>
       homedir && cwd.startsWith(homedir)
         ? `~${cwd.slice(homedir.length)}`
@@ -236,9 +236,7 @@ export class CommsTool {
       const self = a.id === ctx.agentId ? " (you)" : "";
       const cwd = abbreviateCwd(a.cwd);
       const rooms =
-        a.subscribedRooms.length > 0
-          ? a.subscribedRooms.join(", ")
-          : "none";
+        a.subscribedRooms.length > 0 ? a.subscribedRooms.join(", ") : "none";
       return `${a.id}  ${a.name.padEnd(25)} ${a.harness.padEnd(12)} ${a.status.padEnd(7)} ${a.visibility.padEnd(9)} ${cwd}${self}\n        Rooms: ${rooms}`;
     });
     return {
