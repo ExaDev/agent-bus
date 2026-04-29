@@ -154,6 +154,7 @@ export class FileStore implements CommsStore {
       id,
       name: opts.name,
       harness: opts.harness,
+      cwd: opts.cwd,
       pid: opts.pid,
       startedAt: new Date().toISOString(),
       visibility: opts.visibility,

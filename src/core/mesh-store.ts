@@ -712,6 +712,7 @@ export class MeshStore implements CommsStore {
       id,
       name: opts.name,
       harness: opts.harness,
+      cwd: opts.cwd,
       pid: opts.pid,
       startedAt: this.startedAt,
       visibility: opts.visibility,

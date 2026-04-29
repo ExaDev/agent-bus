@@ -63,6 +63,7 @@ export const AgentIdentitySchema = defineSchema(
     id: z.string(),
     name: z.string(),
     harness: z.string(),
+    cwd: z.string(),
     pid: z.number(),
     startedAt: z.string(),
     visibility: Visibility,
