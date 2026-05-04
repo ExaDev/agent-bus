@@ -53,7 +53,7 @@
     "@eslint/json": "1.2.0",
     "@eslint/markdown": "8.0.1",
     "@mariozechner/pi-ai": "0.70.2",
-    "@mariozechner/pi-coding-agent": "0.70.2",
+    "@mariozechner/pi-coding-agent": "0.72.1",
     "@semantic-release/commit-analyzer": "13.0.1",
     "@semantic-release/exec": "6.0.3",
     "@semantic-release/git": "10.0.1",
