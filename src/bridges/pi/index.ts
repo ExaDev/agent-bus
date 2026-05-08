@@ -18,7 +18,7 @@ import {
   ensureRegistered,
   formatDeliveryEvent,
 } from "../../core/index.js";
-import { tryStartWebServer } from "../user/web/server.js";
+import { tryStartWebServer, type WebServerHandle } from "../user/web/server.js";
 import { nanoid } from "../../core/nanoid.js";
 
 export default function (pi: ExtensionAPI) {
@@ -26,6 +26,7 @@ export default function (pi: ExtensionAPI) {
   const tool = new CommsTool(store);
 
   let agentId: string | undefined;
+  let webHandle: WebServerHandle | undefined;
 
   // Incoming messages arrive via TCP mesh — push immediately
   store.onDelivery = (_targetId: string, event) => {
@@ -40,8 +41,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     await store.init();
 
-    // Auto-start web UI (first bridge to bind port 3000 wins)
-    await tryStartWebServer();
+    // Auto-start web UI on a dynamic port
+    webHandle = tryStartWebServer();
 
     const reg = await ensureRegistered({
       store,
@@ -61,6 +62,12 @@ export default function (pi: ExtensionAPI) {
       await store.setAgentOffline(agentId);
     }
     await store.shutdown();
+    if (webHandle) {
+      webHandle.wss.close();
+      webHandle.server.close();
+      await webHandle.controller.shutdown();
+      webHandle = undefined;
+    }
   });
 
   // -----------------------------------------------------------------------
