@@ -26,6 +26,11 @@ import type {
 
 export class ChatController extends EventEmitter {
   private store: MeshStore;
+
+  /** Expose the underlying MeshStore for handle cleanup. */
+  get meshStore(): MeshStore {
+    return this.store;
+  }
   private tool: CommsTool;
   private ctx!: CommsContext;
   private currentRoom: string | undefined;

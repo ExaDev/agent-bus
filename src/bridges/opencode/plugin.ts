@@ -53,7 +53,7 @@ export const AgentCommsPlugin = async (opts: {
   const client = opts.client;
 
   await store.init();
-  await tryStartWebServer();
+  tryStartWebServer();
 
   const reg = await ensureRegistered({
     cwd: process.cwd(),

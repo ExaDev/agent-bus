@@ -105,7 +105,7 @@ export async function run(): Promise<void> {
   // -----------------------------------------------------------------------
 
   await store.init();
-  await tryStartWebServer();
+  tryStartWebServer();
   await mcp.connect(new StdioServerTransport());
 
   const reg = await ensureRegistered({
