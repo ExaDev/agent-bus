@@ -17,41 +17,43 @@
  */
 
 import * as http from "node:http";
-import * as net from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { ChatController } from "../controller.js";
 import { FRONTEND_HTML } from "./index.html.js";
 
-const DEFAULT_WEB_PORT = 3000;
 const WEB_HOST = "127.0.0.1";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface WebServerHandle {
+  server: http.Server;
+  controller: ChatController;
+  wss: WebSocketServer;
+}
 
 // ---------------------------------------------------------------------------
 // Auto-start — called by every bridge after MeshStore.init()
 // ---------------------------------------------------------------------------
 
 /**
- * Try to start the web UI server on the well-known port.
- * Returns the server if this bridge won the race, or undefined if another
- * bridge is already serving. The server runs independently with its own
- * MeshStore that syncs state from the mesh.
+ * Start the web UI server on an OS-assigned port.
+ * Returns the server handle, or undefined if port discovery fails.
  */
-export async function tryStartWebServer(
-  port = DEFAULT_WEB_PORT,
-): Promise<http.Server | undefined> {
-  const alive = await isPortAlive(port, WEB_HOST);
-  if (alive) return undefined;
-
-  const server = createWebServer(port);
-  return server;
+export async function tryStartWebServer(): Promise<
+  WebServerHandle | undefined
+> {
+  return createWebServer();
 }
 
 /**
- * Create and start the web server. Used by tryStartWebServer (auto-start)
- * and runWeb (standalone `npx agent-comms chat` mode).
+ * Create and start the web server on a dynamic port.
+ * Used by tryStartWebServer (auto-start) and runWeb (standalone mode).
  */
-export function createWebServer(port = DEFAULT_WEB_PORT): http.Server {
+export async function createWebServer(port = 0): Promise<WebServerHandle> {
   const controller = new ChatController("Dashboard");
-  void controller.init();
+  await controller.init();
 
   const server = http.createServer((req, res) => {
     handleRequest(req, res, controller);
@@ -63,57 +65,35 @@ export function createWebServer(port = DEFAULT_WEB_PORT): http.Server {
   });
 
   server.listen(port, WEB_HOST, () => {
-    console.log(`Agent Comms web UI: http://${WEB_HOST}:${String(port)}`);
+    const addr = server.address();
+    const actualPort = typeof addr === "object" && addr ? addr.port : port;
+    console.log(`Agent Comms web UI: http://${WEB_HOST}:${String(actualPort)}`);
   });
 
-  return server;
-}
-
-function isPortAlive(port: number, host: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.connect(port, host, () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.on("error", () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
+  return { server, controller, wss };
 }
 
 // ---------------------------------------------------------------------------
 // Standalone mode — `npx agent-comms chat`
 // ---------------------------------------------------------------------------
 
-export async function runWeb(
-  userName: string,
-  port = DEFAULT_WEB_PORT,
-): Promise<void> {
-  const controller = new ChatController(userName);
-  await controller.init();
+export async function runWeb(userName: string, port = 0): Promise<void> {
+  const handle = await createWebServer(port);
 
-  const server = http.createServer((req, res) => {
-    handleRequest(req, res, controller);
-  });
-
-  const wss = new WebSocketServer({ server });
-
-  wss.on("connection", (ws) => {
-    handleWebSocket(ws, controller);
-  });
-
-  server.listen(port, () => {
-    console.log(`Agent Comms web UI: http://localhost:${String(port)}`);
-    console.log(`Connected as ${userName} (user) [${controller.agentId}]`);
+  handle.server.on("listening", () => {
+    const addr = handle.server.address();
+    const actualPort = typeof addr === "object" && addr ? addr.port : port;
+    console.log(`Agent Comms web UI: http://localhost:${String(actualPort)}`);
+    console.log(
+      `Connected as ${userName} (user) [${handle.controller.agentId}]`,
+    );
   });
 
   // Graceful shutdown
   const cleanup = async (): Promise<void> => {
-    wss.close();
-    server.close();
-    await controller.shutdown();
+    handle.wss.close();
+    handle.server.close();
+    await handle.controller.shutdown();
     process.exit(0);
   };
 
