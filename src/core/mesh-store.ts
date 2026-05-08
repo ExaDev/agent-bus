@@ -149,6 +149,12 @@ export class MeshStore implements CommsStore {
     string,
     { socket: net.Socket; buffer: MessageBuffer }
   >();
+  /** All sockets accepted by the data server — destroyed on shutdown. */
+  private dataServerSockets = new Set<net.Socket>();
+  /** All sockets accepted by the coordinator server — destroyed on shutdown. */
+  private coordinatorServerSockets = new Set<net.Socket>();
+  /** Socket connected to the coordinator (client side) — destroyed on shutdown. */
+  private coordinatorSocket: net.Socket | undefined;
   private peerInfo = new Map<string, PeerInfo>();
   private staleCheckTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -169,6 +175,12 @@ export class MeshStore implements CommsStore {
   async init(): Promise<void> {
     await this.startDataServer();
     await this.tryJoinMesh();
+    // Unref all root handles so the event loop can exit when pi shuts down.
+    // Sockets/servers still function normally for I/O but don't keep the
+    // process alive. shutdown() will destroy them explicitly.
+    this.dataServer?.unref();
+    this.coordinatorServer?.unref();
+    this.coordinatorSocket?.unref();
   }
 
   private startDataServer(): Promise<void> {
@@ -200,6 +212,7 @@ export class MeshStore implements CommsStore {
       const socket = net.createConnection(
         { port: this.coordinatorPort, host: COORDINATOR_HOST },
         () => {
+          this.coordinatorSocket = socket;
           const intro: MeshMessage = {
             method: "introduce",
             peerId: this.peerId,
@@ -220,6 +233,7 @@ export class MeshStore implements CommsStore {
           socket.on("error", () => {
             /* ignore late errors */
           });
+          clearTimeout(timer);
           resolve();
         },
       );
@@ -231,6 +245,7 @@ export class MeshStore implements CommsStore {
 
       socket.on("error", (err) => {
         clearTimeout(timer);
+        socket.destroy();
         reject(err);
       });
     });
@@ -287,6 +302,9 @@ export class MeshStore implements CommsStore {
   // -----------------------------------------------------------------------
 
   private handleCoordinatorConnection(socket: net.Socket): void {
+    this.coordinatorServerSockets.add(socket);
+    socket.on("close", () => this.coordinatorServerSockets.delete(socket));
+
     const buffer = new MessageBuffer();
     socket.on("data", (data) => {
       const items = buffer.append(data.toString());
@@ -329,6 +347,9 @@ export class MeshStore implements CommsStore {
   // -----------------------------------------------------------------------
 
   private handleDataConnection(socket: net.Socket): void {
+    this.dataServerSockets.add(socket);
+    socket.on("close", () => this.dataServerSockets.delete(socket));
+
     const buffer = new MessageBuffer();
     let remotePeerId: string | undefined;
 
@@ -481,6 +502,7 @@ export class MeshStore implements CommsStore {
       socket.on("close", () => this.peerConnections.delete(peer.id));
       socket.on("error", () => {
         this.peerConnections.delete(peer.id);
+        socket.destroy();
         resolve();
       });
     });
@@ -1189,20 +1211,27 @@ export class MeshStore implements CommsStore {
       }
     }
 
-    if (!successor) return;
-
-    const peer = this.peerConnections.get(successor.id);
-    if (peer) {
-      const msg: MeshMessage = {
-        method: "become_coordinator",
-        peerList: [...this.peerInfo.values()].filter(
-          (p) => p.id !== this.peerId,
-        ),
-      };
-      await writeAsync(peer.socket, encode(msg));
+    if (successor) {
+      const peer = this.peerConnections.get(successor.id);
+      if (peer) {
+        const msg: MeshMessage = {
+          method: "become_coordinator",
+          peerList: [...this.peerInfo.values()].filter(
+            (p) => p.id !== this.peerId,
+          ),
+        };
+        await writeAsync(peer.socket, encode(msg));
+      }
     }
 
+    // Always clean up coordinator state, even with no successor
     this.stopStaleCheck();
+    for (const socket of this.coordinatorServerSockets) {
+      socket.unref();
+      socket.destroy();
+    }
+    this.coordinatorServerSockets.clear();
+    this.coordinatorServer?.unref();
     this.coordinatorServer?.close();
     this.coordinatorServer = undefined;
     this.isCoordinator = false;
@@ -1224,14 +1253,39 @@ export class MeshStore implements CommsStore {
 
     await this.handoverCoordinator();
 
+    // Destroy the coordinator client socket (not tracked in peerConnections)
+    this.coordinatorSocket?.unref();
+    this.coordinatorSocket?.destroy();
+    this.coordinatorSocket = undefined;
+
+    // Destroy all identified peer connections
     for (const [, peer] of this.peerConnections) {
+      peer.socket.unref();
       peer.socket.destroy();
     }
     this.peerConnections.clear();
 
+    // Destroy all data server accepted sockets (including unidentified)
+    for (const socket of this.dataServerSockets) {
+      socket.unref();
+      socket.destroy();
+    }
+    this.dataServerSockets.clear();
+
+    // Destroy all coordinator server accepted sockets
+    for (const socket of this.coordinatorServerSockets) {
+      socket.unref();
+      socket.destroy();
+    }
+    this.coordinatorServerSockets.clear();
+
     this.stopStaleCheck();
+
+    // Close servers — stop accepting new connections
+    this.dataServer?.unref();
     this.dataServer?.close();
     this.dataServer = undefined;
+    this.coordinatorServer?.unref();
     this.coordinatorServer?.close();
     this.coordinatorServer = undefined;
   }
